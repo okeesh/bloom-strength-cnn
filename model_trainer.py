@@ -9,7 +9,9 @@ from keras.regularizers import l2
 from numpy import argmax
 from load_data import train_images, train_labels, test_images, test_labels
 from experiment_logger import create_experiment_directory, log_experiment_details, save_model, log_training_history, \
-    log_classification_report, log_confusion_matrix
+    log_classification_report, log_confusion_matrix, plot_heatmap, plot_class_probability_distributions, \
+    plot_classification_report
+from experiment_logger import plot_precision_recall_curve
 
 # Define the hyperparameters
 learning_rate = 0.001
@@ -37,8 +39,9 @@ for layer in base_model.layers:
 optimizer = Adam(learning_rate=learning_rate)
 model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
 
-epochs = 5
-batch_size = 16
+# Define the training hyperparameters
+epochs = 50
+batch_size = 32
 
 # Capture relevant variables
 experiment_vars = {
@@ -56,7 +59,6 @@ experiment_vars = {
     "model_summary": model.summary(),
     "train_samples": len(train_images),
     "test_samples": len(test_images),
-
 }
 
 # Create an experiment directory
@@ -120,8 +122,16 @@ log_classification_report(experiment_directory, y_true_classes, y_pred_classes, 
 np.save(os.path.join(experiment_directory, "y_true_classes.npy"), y_true_classes)
 np.save(os.path.join(experiment_directory, "y_pred_classes.npy"), y_pred_classes)
 
+# Predict the probabilities
+y_scores = model.predict(test_images)
+
 # Save the trained model
 # save_model(experiment_directory, model)
+
+# Call the functions
+plot_precision_recall_curve(experiment_directory, y_true_classes, y_scores, len(target_names))
+plot_class_probability_distributions(experiment_directory, y_scores, len(target_names))
+plot_classification_report(experiment_directory, y_true_classes, y_pred_classes, target_names)
 
 # Log the training history
 log_training_history(experiment_directory, history)

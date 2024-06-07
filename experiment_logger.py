@@ -5,6 +5,8 @@ from sklearn.metrics import classification_report
 import json
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.metrics import precision_recall_curve, auc
+
 
 
 def create_experiment_directory(experiment_name):
@@ -59,10 +61,10 @@ def log_training_history(experiment_directory, history):
 
 
 def log_classification_report(experiment_directory, y_true, y_pred, target_names):
-    print(classification_report(y_true, y_pred, target_names=target_names))
-    report = classification_report(y_true, y_pred, target_names=target_names, output_dict=True)
-    with open(f'{experiment_directory}/classification_report.json', 'w') as f:
-        json.dump(report, f)
+    report = classification_report(y_true, y_pred, target_names=target_names, output_dict=True, zero_division=1)
+    report_path = os.path.join(experiment_directory, "classification_report.json")
+    with open(report_path, "w") as f:
+        json.dump(report, f, indent=4)
 
 
 def log_confusion_matrix(experiment_directory, y_true, y_pred, class_names):
@@ -83,4 +85,75 @@ def log_confusion_matrix(experiment_directory, y_true, y_pred, class_names):
     plt.savefig(os.path.join(experiment_directory, 'confusion_matrix.png'))
 
     # Close the plot to free up memory
+    plt.close()
+
+from sklearn.metrics import roc_curve, auc
+from sklearn.preprocessing import label_binarize
+from itertools import cycle
+
+
+
+from sklearn.metrics import precision_recall_curve, auc
+from sklearn.preprocessing import label_binarize
+from itertools import cycle
+
+def plot_precision_recall_curve(experiment_directory, y_true, y_scores, n_classes):
+    # Binarize the output
+    y_true_bin = label_binarize(y_true, classes=[0, 1, 2, 3, 4, 5, 6, 7, 8])
+
+    # Compute Precision-Recall and plot curve for each class
+    precision = dict()
+    recall = dict()
+    average_precision = dict()
+    for i in range(n_classes):
+        precision[i], recall[i], _ = precision_recall_curve(y_true_bin[:, i], y_scores[:, i])
+        average_precision[i] = auc(recall[i], precision[i])
+
+    # Plot Precision-Recall curve for each class
+    plt.figure(figsize=(7, 8))
+    lines = []
+    labels = []
+    for i, color in zip(range(n_classes), cycle(['navy', 'turquoise', 'darkorange', 'cornflowerblue', 'teal'])):
+        l, = plt.plot(recall[i], precision[i], color=color, lw=2)
+        lines.append(l)
+        labels.append('Precision-recall for class {0} (area = {1:0.2f})'
+                      ''.format(i, average_precision[i]))
+
+    fig = plt.gcf()
+    fig.subplots_adjust(bottom=0.25)
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('Extension of Precision-Recall curve to multi-class')
+    plt.legend(lines, labels, loc='upper right', bbox_to_anchor=(1.3, 1))  # Adjust the position of the legend
+    plt.savefig(os.path.join(experiment_directory, 'precision_recall_curve.png'))
+    plt.close()
+
+
+import seaborn as sns
+
+def plot_class_probability_distributions(experiment_directory, y_scores, n_classes):
+    # Plot the predicted probability distributions for each class
+    plt.figure(figsize=(10, 6))
+    for i in range(n_classes):
+        sns.kdeplot(y_scores[:, i], label=f'Class {i}')
+
+    plt.xlabel('Predicted Probability')
+    plt.ylabel('Density')
+    plt.title('Predicted Probability Distributions for Each Class')
+    plt.legend()
+    plt.savefig(os.path.join(experiment_directory, 'class_probability_distributions.png'))
+    plt.close()
+
+import pandas as pd
+
+def plot_classification_report(experiment_directory, y_true, y_pred, target_names):
+    report = classification_report(y_true, y_pred, target_names=target_names, output_dict=True)
+    report_df = pd.DataFrame(report).transpose()
+
+    report_df[['precision', 'recall', 'f1-score']].drop(['accuracy', 'macro avg', 'weighted avg']).plot(kind='bar', figsize=(10, 7))
+    plt.title('Classification Report')
+    plt.grid(True)
+    plt.savefig(os.path.join(experiment_directory, 'classification_report.png'))
     plt.close()
