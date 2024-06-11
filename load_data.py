@@ -3,26 +3,26 @@ import os
 from keras.utils import load_img, img_to_array
 import numpy as np
 from sklearn.model_selection import train_test_split
-from keras.utils import to_categorical
-import os
-import numpy as np
 
 # Define the paths for the numpy files
 train_images_np_file = 'train_images.npy'
 train_labels_np_file = 'train_labels.npy'
+validation_images_np_file = 'validation_images.npy'
+validation_labels_np_file = 'validation_labels.npy'
 test_images_np_file = 'test_images.npy'
 test_labels_np_file = 'test_labels.npy'
 
 # Check if the numpy files exist
-if os.path.exists(train_images_np_file) and os.path.exists(train_labels_np_file) and os.path.exists(test_images_np_file) and os.path.exists(test_labels_np_file):
+if os.path.exists(train_images_np_file) and os.path.exists(train_labels_np_file) and os.path.exists(validation_images_np_file) and os.path.exists(validation_labels_np_file) and os.path.exists(test_images_np_file) and os.path.exists(test_labels_np_file):
     # Load the data from the numpy files
     print("Loading saved values..")
     train_images = np.load(train_images_np_file)
     train_labels = np.load(train_labels_np_file)
+    validation_images = np.load(validation_images_np_file)
+    validation_labels = np.load(validation_labels_np_file)
     test_images = np.load(test_images_np_file)
     test_labels = np.load(test_labels_np_file)
 else:
-
     # Load the annotation file
     annotation_file = "dataset/annotations/instances_Train.json"
     with open(annotation_file) as f:
@@ -54,7 +54,7 @@ else:
 
                 if image_path is not None:
                     image_paths.append(image_path)
-                    labels.append(bloom_strength)
+                    labels.append(int(bloom_strength))  # Convert bloom_strength to integer
 
     # Load images and preprocess them
     def load_and_preprocess_image(image_path):
@@ -64,32 +64,18 @@ else:
 
     images = [load_and_preprocess_image(image_path) for image_path in image_paths]
     images = np.array(images)
+    labels = np.array(labels) - 1  # Subtract 1 from labels to ensure they are in the range 0 to 8
 
     print(f"Loaded {len(images)} images with corresponding labels")
 
-    # Create a list of tuples containing image paths and corresponding labels
-    data = list(zip(image_paths, labels))
+    # Split the data into train, validation, and test sets using stratified sampling
+    train_images, temp_images, train_labels, temp_labels = train_test_split(images, labels, test_size=0.3, stratify=labels, random_state=42)
+    validation_images, test_images, validation_labels, test_labels = train_test_split(temp_images, temp_labels, test_size=0.5, stratify=temp_labels, random_state=42)
 
-    # Split the data into train and test sets
-    train_data, test_data = train_test_split(data, test_size=0.2, random_state=42)
-
-    # Create separate lists for train and test images and labels
-    train_images_paths, train_labels = zip(*train_data)
-    test_images_paths, test_labels = zip(*test_data)
-
-    # Load train and test images
-    train_images = np.array([load_and_preprocess_image(img_path) for img_path in train_images_paths])
-    test_images = np.array([load_and_preprocess_image(img_path) for img_path in test_images_paths])
-
-    # Subtract 1 from labels to ensure they are in the range 0 to 8
-    train_labels = np.array([label - 1 for label in train_labels])
-    test_labels = np.array([label - 1 for label in test_labels])
-
-    # One-hot encode the labels
-    train_labels = to_categorical(train_labels, num_classes=9)
-    test_labels = to_categorical(test_labels, num_classes=9)
-
+    # Save the train, validation, and test data as numpy files
     np.save(train_images_np_file, train_images)
     np.save(train_labels_np_file, train_labels)
+    np.save(validation_images_np_file, validation_images)
+    np.save(validation_labels_np_file, validation_labels)
     np.save(test_images_np_file, test_images)
     np.save(test_labels_np_file, test_labels)
