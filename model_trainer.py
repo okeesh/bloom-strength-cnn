@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from keras.applications import ResNet50, MobileNet
+from keras.applications import ResNet50, MobileNet, MobileNetV2
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.layers import Dense, GlobalAveragePooling2D, Dropout
 from keras.models import Model
@@ -19,7 +19,7 @@ dropout_rate = 0.7
 target_names = [f'class_{i}' for i in range(9)]
 
 # Load the pre-trained ResNet50 model
-base_model = ResNet50(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
 
 # Add custom classifier layers
 x = base_model.output
