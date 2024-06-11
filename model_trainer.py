@@ -18,8 +18,8 @@ learning_rate = 0.001
 dropout_rate = 0.7
 target_names = [f'class_{i}' for i in range(9)]
 
-# Load the pre-trained ResNet50 model
-base_model = ResNet50(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+# Load the base model with pre-trained weights and without the top layers (include_top=False) and input shape (224, 224, 3) for the images in the dataset (224x224 pixels with 3 channels) and the number of classes (9) in the dataset (include_top=False)
+base_model = MobileNet(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
 
 # Add custom classifier layers
 x = base_model.output
