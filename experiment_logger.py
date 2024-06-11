@@ -1,12 +1,15 @@
+import json
 import os
 from datetime import datetime
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import classification_report
-import json
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.metrics import precision_recall_curve, auc
-
+import pandas as pd
+from sklearn.metrics import classification_report
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import precision_recall_curve
+from sklearn.metrics import auc
+from sklearn.preprocessing import label_binarize
+from itertools import cycle
 
 
 def create_experiment_directory(experiment_name):
@@ -61,10 +64,20 @@ def log_training_history(experiment_directory, history):
 
 
 def log_classification_report(experiment_directory, y_true, y_pred, target_names):
-    report = classification_report(y_true, y_pred, target_names=target_names, output_dict=True, zero_division=1)
+    report = classification_report(y_true, y_pred, target_names=target_names, output_dict=True,  zero_division=1)
     report_path = os.path.join(experiment_directory, "classification_report.json")
     with open(report_path, "w") as f:
         json.dump(report, f, indent=4)
+
+
+def print_unique_classes(labels):
+    # Convert one-hot encoded labels back to class labels
+    class_labels = np.argmax(labels, axis=1)
+
+    # Get the unique class labels
+    unique_classes = np.unique(class_labels)
+
+    print(f"Unique classes: {unique_classes}")
 
 
 def log_confusion_matrix(experiment_directory, y_true, y_pred, class_names):
@@ -87,15 +100,6 @@ def log_confusion_matrix(experiment_directory, y_true, y_pred, class_names):
     # Close the plot to free up memory
     plt.close()
 
-from sklearn.metrics import roc_curve, auc
-from sklearn.preprocessing import label_binarize
-from itertools import cycle
-
-
-
-from sklearn.metrics import precision_recall_curve, auc
-from sklearn.preprocessing import label_binarize
-from itertools import cycle
 
 def plot_precision_recall_curve(experiment_directory, y_true, y_scores, n_classes):
     # Binarize the output
@@ -133,6 +137,7 @@ def plot_precision_recall_curve(experiment_directory, y_true, y_scores, n_classe
 
 import seaborn as sns
 
+
 def plot_class_probability_distributions(experiment_directory, y_scores, n_classes):
     # Plot the predicted probability distributions for each class
     plt.figure(figsize=(10, 6))
@@ -146,13 +151,22 @@ def plot_class_probability_distributions(experiment_directory, y_scores, n_class
     plt.savefig(os.path.join(experiment_directory, 'class_probability_distributions.png'))
     plt.close()
 
-import pandas as pd
+
+def plot_class_distribution(labels):
+    plt.hist(labels, bins=np.arange(min(labels), max(labels) + 2) - 0.5, edgecolor='black')
+    plt.xlabel('Class')
+    plt.ylabel('Frequency')
+    plt.title('Class Distribution')
+    plt.xticks(range(min(labels), max(labels) + 1))
+    plt.show()
+
 
 def plot_classification_report(experiment_directory, y_true, y_pred, target_names):
     report = classification_report(y_true, y_pred, target_names=target_names, output_dict=True)
     report_df = pd.DataFrame(report).transpose()
 
-    report_df[['precision', 'recall', 'f1-score']].drop(['accuracy', 'macro avg', 'weighted avg']).plot(kind='bar', figsize=(10, 7))
+    report_df[['precision', 'recall', 'f1-score']].drop(['accuracy', 'macro avg', 'weighted avg']).plot(kind='bar',
+                                                                                                        figsize=(10, 7))
     plt.title('Classification Report')
     plt.grid(True)
     plt.savefig(os.path.join(experiment_directory, 'classification_report.png'))

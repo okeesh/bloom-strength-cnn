@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from keras.applications import ResNet50, MobileNet
+from keras.applications import ResNet50, MobileNet, VGG16
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.layers import Dense, GlobalAveragePooling2D, Dropout
 from keras.models import Model
@@ -12,6 +12,8 @@ from experiment_logger import create_experiment_directory, log_experiment_detail
     log_classification_report, log_confusion_matrix, plot_heatmap, plot_class_probability_distributions, \
     plot_classification_report
 from experiment_logger import plot_precision_recall_curve
+from experiment_logger import print_unique_classes
+
 
 # Define the hyperparameters
 learning_rate = 0.001
@@ -110,6 +112,7 @@ history = model.fit(
 # )
 
 # Predict the classes
+
 y_pred = model.predict(test_images)
 y_pred_classes = argmax(y_pred, axis=-1)
 
@@ -133,6 +136,7 @@ y_scores = model.predict(test_images)
 # save_model(experiment_directory, model)
 
 # Call the functions
+
 plot_precision_recall_curve(experiment_directory, y_true_classes, y_scores, len(target_names))
 plot_class_probability_distributions(experiment_directory, y_scores, len(target_names))
 plot_classification_report(experiment_directory, y_true_classes, y_pred_classes, target_names)
