@@ -97,9 +97,14 @@ else:
     np.save(test_images_np_file, test_images)
     np.save(test_labels_np_file, test_labels)
 
-    # Calculate class weights based on class frequency
+    # Calculate class weights
     class_weights = class_weight.compute_class_weight('balanced', classes=np.unique(np.argmax(train_labels, axis=1)),
                                                       y=np.argmax(train_labels, axis=1))
     class_weights = dict(enumerate(class_weights))
+
+    # Print out the class weights for each class and the number of images for that respective class
+    for i in range(9):
+        print(f"Class {i} - Number of images: {np.sum(np.argmax(train_labels, axis=1) == i)}, Class weight: {class_weights[i]}")
+
 
     np.save(class_weights_np_file, class_weights)

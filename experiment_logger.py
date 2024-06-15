@@ -126,6 +126,42 @@ def plot_classification_report(experiment_directory, y_true, y_pred, target_name
     plt.close()
 
 
+def plot_class_weights_and_frequencies(experiment_directory, class_weights, train_labels):
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # Retrieve class weights and frequencies
+    weights = list(class_weights.values())
+
+    # Check if train_labels is one-hot encoded
+    if len(train_labels.shape) == 2:
+        # Convert one-hot encoded labels to class indices
+        train_labels = np.argmax(train_labels, axis=1)
+
+    frequencies = np.bincount(train_labels)
+
+    # Create a new figure for the plots
+    plt.figure(figsize=(14, 6))
+
+    # Create a bar plot for class weights
+    plt.subplot(1, 2, 1)
+    plt.bar(range(len(weights)), weights, color='blue', alpha=0.7)
+    plt.xlabel('Class')
+    plt.ylabel('Weight')
+    plt.title('Class Weights')
+
+    # Create a bar plot for class frequencies
+    plt.subplot(1, 2, 2)
+    plt.bar(range(len(frequencies)), frequencies, color='green', alpha=0.7)
+    plt.xlabel('Class')
+    plt.ylabel('Frequency')
+    plt.title('Class Frequencies')
+
+    # Save the plots
+    plt.tight_layout()
+    plt.savefig(os.path.join(experiment_directory, 'class_weights_and_frequencies.png'))
+    plt.close()
+
 def log_misclassified_samples(experiment_directory, test_images, test_labels, y_pred_classes):
     misclassified_indices = np.where(test_labels != y_pred_classes)[0]
     misclassified_images = test_images[misclassified_indices]
