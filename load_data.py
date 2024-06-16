@@ -10,22 +10,18 @@ train_images_np_file = 'train_images.npy'
 train_labels_np_file = 'train_labels.npy'
 validation_images_np_file = 'validation_images.npy'
 validation_labels_np_file = 'validation_labels.npy'
-test_images_np_file = 'test_images.npy'
-test_labels_np_file = 'test_labels.npy'
 class_weights_np_file = 'class_weights.npy'
 
 # Check if the numpy files exist
 if os.path.exists(class_weights_np_file) and os.path.exists(train_images_np_file) and os.path.exists(
         train_labels_np_file) and os.path.exists(validation_images_np_file) and os.path.exists(
-        validation_labels_np_file) and os.path.exists(test_images_np_file) and os.path.exists(test_labels_np_file):
+        validation_labels_np_file):
     # Load the data from the numpy files
     print("Loading saved values..")
     train_images = np.load(train_images_np_file)
     train_labels = np.load(train_labels_np_file)
     validation_images = np.load(validation_images_np_file)
     validation_labels = np.load(validation_labels_np_file)
-    test_images = np.load(test_images_np_file)
-    test_labels = np.load(test_labels_np_file)
     class_weights = np.load(class_weights_np_file, allow_pickle=True).item()
 
 else:
@@ -82,26 +78,19 @@ else:
 
     # ... (previous code remains the same)
 
-    # Split the data into train, validation, and test sets using stratified sampling
-    train_images, temp_images, train_labels, temp_labels = train_test_split(images, labels, test_size=0.3,
-                                                                            stratify=labels, random_state=42)
-    validation_images, test_images, validation_labels, test_labels = train_test_split(temp_images, temp_labels,
-                                                                                      test_size=0.5,
-                                                                                      stratify=temp_labels,
-                                                                                      random_state=42)
+    # Split the data into train and validation sets using stratified sampling
+    train_images, validation_images, train_labels, validation_labels = train_test_split(images, labels, test_size=0.2,
+                                                                                        stratify=labels, random_state=42)
 
     # One-hot encode the labels
     train_labels = to_categorical(train_labels, num_classes=9)
     validation_labels = to_categorical(validation_labels, num_classes=9)
-    test_labels = to_categorical(test_labels, num_classes=9)
 
-    # Save the train, validation, and test data as numpy files
+    # Save the train and validation data as numpy files
     np.save(train_images_np_file, train_images)
     np.save(train_labels_np_file, train_labels)
     np.save(validation_images_np_file, validation_images)
     np.save(validation_labels_np_file, validation_labels)
-    np.save(test_images_np_file, test_images)
-    np.save(test_labels_np_file, test_labels)
 
     # Calculate class weights
     class_weights = class_weight.compute_class_weight('balanced', classes=np.unique(np.argmax(train_labels, axis=1)),
