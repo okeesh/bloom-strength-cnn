@@ -23,6 +23,10 @@ assert len(np.unique(np.argmax(train_labels, axis=1))) == 9
 assert len(np.unique(np.argmax(validation_labels, axis=1))) == 9
 assert len(np.unique(np.argmax(test_labels, axis=1))) == 9
 
+print("Length of train_labels: ", len(train_labels))
+print("Length of validation_labels: ", len(validation_labels))
+print("Length of test_labels: ", len(test_labels))
+
 # Load the pre-trained ResNet50 model
 base_model = ResNet50(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
 

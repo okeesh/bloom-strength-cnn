@@ -15,7 +15,9 @@ test_labels_np_file = 'test_labels.npy'
 class_weights_np_file = 'class_weights.npy'
 
 # Check if the numpy files exist
-if os.path.exists(class_weights_np_file) and os.path.exists(train_images_np_file) and os.path.exists(train_labels_np_file) and os.path.exists(validation_images_np_file) and os.path.exists(validation_labels_np_file) and os.path.exists(test_images_np_file) and os.path.exists(test_labels_np_file):
+if os.path.exists(class_weights_np_file) and os.path.exists(train_images_np_file) and os.path.exists(
+        train_labels_np_file) and os.path.exists(validation_images_np_file) and os.path.exists(
+        validation_labels_np_file) and os.path.exists(test_images_np_file) and os.path.exists(test_labels_np_file):
     # Load the data from the numpy files
     print("Loading saved values..")
     train_images = np.load(train_images_np_file)
@@ -54,17 +56,21 @@ else:
 
             if bloom_strength is not None:
                 # Find the corresponding image path
-                image_path = next((os.path.join("dataset/images", image_info["file_name"]) for image_info in images_info if image_info["id"] == image_id), None)
+                image_path = next(
+                    (os.path.join("dataset/images", image_info["file_name"]) for image_info in images_info if
+                     image_info["id"] == image_id), None)
 
                 if image_path is not None:
                     image_paths.append(image_path)
                     labels.append(int(bloom_strength))  # Convert bloom_strength to integer
+
 
     # Load images and preprocess them
     def load_and_preprocess_image(image_path):
         image = load_img(image_path, target_size=(224, 224))
         image = img_to_array(image)
         return image
+
 
     images = [load_and_preprocess_image(image_path) for image_path in image_paths]
     images = np.array(images)
@@ -104,7 +110,7 @@ else:
 
     # Print out the class weights for each class and the number of images for that respective class
     for i in range(9):
-        print(f"Class {i} - Number of images: {np.sum(np.argmax(train_labels, axis=1) == i)}, Class weight: {class_weights[i]}")
-
+        print(
+            f"Class {i} - Number of images: {np.sum(np.argmax(train_labels, axis=1) == i)}, Class weight: {class_weights[i]}")
 
     np.save(class_weights_np_file, class_weights)
