@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from keras.utils import load_img, img_to_array
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -12,10 +13,31 @@ validation_images_np_file = 'validation_images.npy'
 validation_labels_np_file = 'validation_labels.npy'
 class_weights_np_file = 'class_weights.npy'
 
+# Define paths for the new dataset
+new_image_dir = "dataset/images_title_lable"
+new_annotation_file = "dataset/annotations/new_annotations.json"
+
+
+# Function to extract bloom strength from filename
+def extract_bloom_strength(filename):
+    match = re.search(r'_(\d+\.\d+)_', filename)
+    if match:
+        bloom_strength = float(match.group(1))
+        return int(round(bloom_strength))
+    return None
+
+
+# Function to load and preprocess image
+def load_and_preprocess_image(image_path):
+    image = load_img(image_path, target_size=(224, 224))
+    image = img_to_array(image)
+    return image
+
+
 # Check if the numpy files exist
-if os.path.exists(class_weights_np_file) and os.path.exists(train_images_np_file) and os.path.exists(
-        train_labels_np_file) and os.path.exists(validation_images_np_file) and os.path.exists(
-        validation_labels_np_file):
+if os.path.exists(class_weights_np_file) and os.path.exists(train_images_np_file) and \
+        os.path.exists(train_labels_np_file) and os.path.exists(validation_images_np_file) and \
+        os.path.exists(validation_labels_np_file):
     # Load the data from the numpy files
     print("Loading saved values..")
     train_images = np.load(train_images_np_file)
@@ -25,7 +47,7 @@ if os.path.exists(class_weights_np_file) and os.path.exists(train_images_np_file
     class_weights = np.load(class_weights_np_file, allow_pickle=True).item()
 
 else:
-    # Load the annotation file
+    # Load the original annotation file
     annotation_file = "dataset/annotations/instances_Train.json"
     with open(annotation_file) as f:
         coco_data = json.load(f)
@@ -37,53 +59,90 @@ else:
     image_paths = []
     labels = []
 
+    # Process original dataset
+    original_images_count = 0
     for annotation in annotations_info:
         image_id = annotation["image_id"]
         category_id = annotation["category_id"]
 
-        # Find the corresponding category name
         category_name = next((category["name"] for category in categories if category["id"] == category_id), None)
 
-        # Check if the category name is "tree"
         if category_name == "tree":
-            # Extract the "bloom_strength" attribute value
             attributes = annotation["attributes"]
             bloom_strength = attributes.get("bloom strenght")
 
             if bloom_strength is not None:
-                # Find the corresponding image path
                 image_path = next(
                     (os.path.join("dataset/images", image_info["file_name"]) for image_info in images_info if
                      image_info["id"] == image_id), None)
 
                 if image_path is not None:
                     image_paths.append(image_path)
-                    labels.append(int(bloom_strength))  # Convert bloom_strength to integer
+                    labels.append(int(bloom_strength))
+                    original_images_count += 1
 
+    print(f"Loaded {original_images_count} images from original dataset")
 
-    # Load images and preprocess them
-    def load_and_preprocess_image(image_path):
-        image = load_img(image_path, target_size=(224, 224))
-        image = img_to_array(image)
-        return image
+    # Process new dataset
+    new_images_count = 0
+    ignored_images_count = 0
 
+    # Load the new COCO annotations
+    with open(new_annotation_file) as f:
+        new_coco_data = json.load(f)
 
+    new_annotations_info = new_coco_data["annotations"]
+    new_images_info = new_coco_data["images"]
+
+    # Create a dictionary to map image IDs to filenames
+    image_id_to_filename = {img["id"]: img["file_name"] for img in new_images_info}
+
+    for annotation in new_annotations_info:
+        image_id = annotation["image_id"]
+        filename = image_id_to_filename[image_id]
+
+        bloom_strength = extract_bloom_strength(filename)
+
+        if bloom_strength is not None:
+            if bloom_strength != 0:  # Ignore only images with bloom strength 0
+                image_path = os.path.join(new_image_dir, filename)
+                image_paths.append(image_path)
+                labels.append(bloom_strength)
+                new_images_count += 1
+            else:
+                ignored_images_count += 1
+
+    print(f"Loaded {new_images_count} new images from {new_image_dir}")
+    print(f"Ignored {ignored_images_count} images with bloom strength 0")
+    print(f"Total images now: {len(image_paths)}")
+
+    # Load and preprocess all images
     images = [load_and_preprocess_image(image_path) for image_path in image_paths]
     images = np.array(images)
-    labels = np.array(labels) - 1  # Subtract 1 from labels to ensure they are in the range 0 to 8
+    labels = np.array(labels)
 
-    print(f"Loaded {len(images)} images with corresponding labels")
+    print(f"Preprocessed {len(images)} images with corresponding labels")
+    print(f"Unique labels before adjustment: {np.unique(labels)}")
+    print(f"Label distribution before adjustment: {np.bincount(labels)}")
+
+    # Adjust labels to be in range 0-8 for neural network
+    labels = labels - 1
+
+    print(f"Unique labels after adjustment: {np.unique(labels)}")
+    print(f"Label distribution after adjustment: {np.bincount(labels)}")
 
     from keras.utils import to_categorical
 
-    # ... (previous code remains the same)
-
     # Split the data into train and validation sets using stratified sampling
     train_images, validation_images, train_labels, validation_labels = train_test_split(images, labels, test_size=0.2,
-                                                                                        stratify=labels, random_state=42)
+                                                                                        stratify=labels,
+                                                                                        random_state=42)
+
+    print(f"Training set: {len(train_images)} images")
+    print(f"Validation set: {len(validation_images)} images")
 
     # One-hot encode the labels
-    train_labels = to_categorical(train_labels, num_classes=9)
+    train_labels = to_categorical(train_labels, num_classes=9)  # 9 classes (0-8)
     validation_labels = to_categorical(validation_labels, num_classes=9)
 
     # Save the train and validation data as numpy files
@@ -91,6 +150,8 @@ else:
     np.save(train_labels_np_file, train_labels)
     np.save(validation_images_np_file, validation_images)
     np.save(validation_labels_np_file, validation_labels)
+
+    print("Saved preprocessed data to numpy files")
 
     # Calculate class weights
     class_weights = class_weight.compute_class_weight('balanced', classes=np.unique(np.argmax(train_labels, axis=1)),
@@ -103,3 +164,5 @@ else:
             f"Class {i} - Number of images: {np.sum(np.argmax(train_labels, axis=1) == i)}, Class weight: {class_weights[i]}")
 
     np.save(class_weights_np_file, class_weights)
+
+print("Data processing and saving completed.")

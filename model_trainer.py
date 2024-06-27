@@ -10,12 +10,13 @@ from load_data import train_images, train_labels, validation_images, validation_
 from experiment_logger import create_experiment_directory, log_experiment_details, save_model, log_training_history, \
     log_classification_report, log_confusion_matrix, plot_precision_recall_curve, plot_class_probability_distributions, \
     plot_classification_report, plot_class_weights_and_frequencies
+from keras.applications import MobileNet
 
 # Define the hyperparameters
 learning_rate = 0.001
 dropout_rate = 0.7
 target_names = [f'class_{i}' for i in range(9)]
-batch_size = 16
+batch_size = 32
 epochs = 50
 
 # Check if the train and validation labels have 9 unique classes
@@ -25,8 +26,9 @@ assert len(np.unique(np.argmax(validation_labels, axis=1))) == 9
 print("Length of train_labels: ", len(train_labels))
 print("Length of validation_labels: ", len(validation_labels))
 
-# Load the pre-trained ResNet50 model
-base_model = ResNet50(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+# Load the pre-trained MobileNet model
+base_model = MobileNet(weights='imagenet', include_top=False)
+
 
 # Add custom classifier layers
 x = base_model.output
