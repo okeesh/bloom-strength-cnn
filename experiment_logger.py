@@ -36,26 +36,13 @@ def log_training_history(experiment_directory, history):
 
     # Plot training and validation loss
     plt.figure(figsize=(10, 6))
-    plt.plot(history['loss'], label='Training Loss')
     plt.plot(history['val_loss'], label='Validation Loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
-    plt.title('Training and Validation Loss')
+    plt.title('Validation Loss')
     plt.legend()
     plt.savefig(os.path.join(experiment_directory, 'loss_plot.png'))
     plt.close()
-
-    # Plot training and validation accuracy
-    plt.figure(figsize=(10, 6))
-    plt.plot(history['accuracy'], label='Training Accuracy')
-    plt.plot(history['val_accuracy'], label='Validation Accuracy')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.title('Training and Validation Accuracy')
-    plt.legend()
-    plt.savefig(os.path.join(experiment_directory, 'accuracy_plot.png'))
-    plt.close()
-
 
 def log_classification_report(experiment_directory, y_true, y_pred, target_names):
     report = classification_report(y_true, y_pred, target_names=target_names, output_dict=True, zero_division=1)
