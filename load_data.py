@@ -5,6 +5,27 @@ import numpy as np
 from keras.utils import load_img, img_to_array
 from sklearn.model_selection import train_test_split
 from sklearn.utils import class_weight
+import matplotlib.pyplot as plt
+
+
+def delete_saved_data(subdirectory='numpy_files'):
+    # Define the paths for the numpy files
+    train_images_np_file = os.path.join(subdirectory, 'train_images.npy')
+    train_labels_np_file = os.path.join(subdirectory, 'train_labels.npy')
+    validation_images_np_file = os.path.join(subdirectory, 'validation_images.npy')
+    validation_labels_np_file = os.path.join(subdirectory, 'validation_labels.npy')
+    class_weights_np_file = os.path.join(subdirectory, 'class_weights.npy')
+
+    # Delete the numpy files if they exist
+    for file_path in [train_images_np_file, train_labels_np_file, validation_images_np_file, validation_labels_np_file,
+                      class_weights_np_file]:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            print(f"Deleted: {file_path}")
+        else:
+            print(f"File not found: {file_path}")
+
+    print("Saved data deleted successfully.")
 
 
 def load_data(model_type='classification'):
@@ -34,6 +55,7 @@ def load_data(model_type='classification'):
     def load_and_preprocess_image(image_path):
         image = load_img(image_path, target_size=(224, 224))
         image = img_to_array(image)
+        image = image / 255.0  # Normalize pixel values
         return image
 
     # Check if the numpy files exist
@@ -73,7 +95,7 @@ def load_data(model_type='classification'):
                 attributes = annotation["attributes"]
                 bloom_strength = attributes.get("bloom strenght")
 
-                if bloom_strength is not None:
+                if bloom_strength is not None and bloom_strength != 0:  # Ignore images with bloom strength 0
                     image_path = next(
                         (os.path.join("dataset/images", image_info["file_name"]) for image_info in images_info if
                          image_info["id"] == image_id), None)
@@ -106,7 +128,7 @@ def load_data(model_type='classification'):
             bloom_strength = extract_bloom_strength(filename)
 
             if bloom_strength is not None:
-                if bloom_strength != 0:  # Ignore only images with bloom strength 0
+                if bloom_strength != 0:  # Ignore images with bloom strength 0
                     image_path = os.path.join(new_image_dir, filename)
                     image_paths.append(image_path)
                     labels.append(bloom_strength)
@@ -125,7 +147,7 @@ def load_data(model_type='classification'):
 
         print(f"Preprocessed {len(images)} images with corresponding labels")
         print(f"Unique labels before adjustment: {np.unique(labels)}")
-        print(f"Label distribution before adjustment: {np.bincount(labels)}")
+        print(f"Label distribution before adjustment: {np.bincount(labels)[1:]}")  # Exclude count of label 0
 
         # Split the data into train and validation sets using stratified sampling
         train_images, validation_images, train_labels, validation_labels = train_test_split(images, labels,
@@ -147,7 +169,7 @@ def load_data(model_type='classification'):
             from keras.utils import to_categorical
             train_labels = to_categorical(train_labels, num_classes=9)  # 9 classes (0-8)
             validation_labels = to_categorical(validation_labels, num_classes=9)
-        else:  # regression
+        else:  # regression or hierarchical_partial_labels
             # Keep labels as is (1-9 range)
             train_labels = train_labels.reshape(-1, 1)
             validation_labels = validation_labels.reshape(-1, 1)
@@ -177,8 +199,31 @@ def load_data(model_type='classification'):
             class_weights = None
 
     print("Data processing and saving completed.")
+
+    # Print summary statistics
+    print("Data Summary:")
+    print(f"Total images: {len(image_paths)}")
+    print(f"Training set: {len(train_images)} images")
+    print(f"Validation set: {len(validation_images)} images")
+    print(f"Unique labels: {np.unique(labels)}")
+    print(f"Label distribution: {np.bincount(labels)[1:]}")  # Exclude count of label 0
+
+    # Visualize sample images
+    fig, axes = plt.subplots(2, 5, figsize=(15, 6))
+    axes = axes.flatten()
+    for i in range(10):
+        idx = np.random.randint(len(train_images))
+        img = train_images[idx]
+        label = np.argmax(train_labels[idx]) + 1 if model_type == 'classification' else train_labels[
+            idx]  # Adjust label back to 1-9 range for display
+        axes[i].imshow(img)
+        axes[i].set_title(f"Label: {label}")
+        axes[i].axis('off')
+    plt.tight_layout()
+    plt.show()
+
     return train_images, train_labels, validation_images, validation_labels, class_weights
 
 
 if __name__ == '__main__':
-    load_data()
+    load_data(model_type='hierarchical_partial_labels')
