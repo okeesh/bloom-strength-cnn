@@ -29,8 +29,8 @@ class ModelConfig:
             raise ValueError("batch_size must be positive")
         if self.epochs <= 0:
             raise ValueError("epochs must be positive")
-        if self.model_type not in ['regression', 'classification']:
-            raise ValueError("model_type must be 'regression' or 'classification'")
+        if self.model_type not in ['regression', 'classification', 'hierarchical']:
+            raise ValueError("model_type must be 'regression' or 'classification' or 'hierarchical'")
         if self.model_type == 'classification' and self.num_classes is None:
             raise ValueError("num_classes must be specified for classification models")
 

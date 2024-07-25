@@ -8,7 +8,7 @@ from datetime import datetime
 
 from matplotlib import pyplot as plt
 
-from model_config import BaseModel, ModelConfig
+from model_class.model_config import BaseModel, ModelConfig
 
 
 class RegressionModel(BaseModel):

@@ -1,8 +1,9 @@
 import copy
 
-from classification_model import ClassificationModel
-from model_config import ModelConfig
-from regression_model import RegressionModel
+from models.classification_model import ClassificationModel
+from models.hierarchicalpartial_model import HierarchicalPartialLossModel
+from model_class.model_config import ModelConfig
+from models.regression_model import RegressionModel
 
 import itertools
 from typing import Dict, List, Any, Tuple
@@ -18,8 +19,8 @@ class ModelTrainer:
             return RegressionModel(self.config)
         elif self.config.model_type == 'classification':
             return ClassificationModel(self.config)
-        # elif self.config.model_type == 'partial_label':
-        #     return PartialLabelModel(self.config)
+        elif self.config.model_type == 'hierarchical':
+            return HierarchicalPartialLossModel(self.config)
         else:
             raise ValueError(f"Unsupported model type: {self.config.model_type}")
 

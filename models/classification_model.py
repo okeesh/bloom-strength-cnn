@@ -1,16 +1,13 @@
 import os
 from datetime import datetime
 
-import numpy as np
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.layers import Dense, GlobalAveragePooling2D, Dropout
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.regularizers import l2
 from matplotlib import pyplot as plt
-from sklearn.metrics import accuracy_score
-import experiment_logger as logger
-from model_config import ModelConfig, BaseModel
+from model_class.model_config import ModelConfig, BaseModel
 
 
 class ClassificationModel(BaseModel):

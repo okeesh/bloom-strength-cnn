@@ -30,7 +30,7 @@ def delete_saved_data(subdirectory='numpy_files'):
 
 def load_data(model_type='classification'):
     # Define the subdirectory for the numpy files
-    subdirectory = 'numpy_files'
+    subdirectory = 'dataset/numpy_files'
 
     # Define the paths for the numpy files
     train_images_np_file = os.path.join(subdirectory, 'train_images.npy')
@@ -151,7 +151,7 @@ def load_data(model_type='classification'):
 
         # Split the data into train and validation sets using stratified sampling
         train_images, validation_images, train_labels, validation_labels = train_test_split(images, labels,
-                                                                                            test_size=0.2,
+                                                                                            test_size=0.3,
                                                                                             stratify=labels,
                                                                                             random_state=42)
 
