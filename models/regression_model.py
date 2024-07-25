@@ -16,6 +16,8 @@ class RegressionModel(BaseModel):
         self.config = config
 
     def create_model(self):
+        for layer in self.config.pretrained_model.layers:
+            layer.trainable = False
         x = self.config.pretrained_model.output
         x = GlobalAveragePooling2D()(x)
         x = Dropout(self.config.dropout_rate)(x)

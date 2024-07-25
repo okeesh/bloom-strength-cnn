@@ -18,10 +18,12 @@ class HierarchicalPartialLossModel(BaseModel):
         self.config = config
 
     def create_model(self):
+        for layer in self.config.pretrained_model.layers:
+            layer.trainable = False
         x = self.config.pretrained_model.output
         x = GlobalAveragePooling2D()(x)
         x = Dropout(self.config.dropout_rate)(x)
-        x = Dense(self.config.dense_units, activation=self.config.activation, kernel_regularizer='l2')(x)
+        x = Dense(self.config.dense_units, activation="relu", kernel_regularizer='l2')(x)
         x = Dense(self.config.num_classes, activation="softmax")(x)
 
         model = Model(inputs=self.config.pretrained_model.input, outputs=x)
@@ -30,7 +32,7 @@ class HierarchicalPartialLossModel(BaseModel):
     def compile_model(self, model):
         model.compile(optimizer=Adam(lr=self.config.learning_rate),
                       loss=HierarchicalPartialLossModel.CumulatedCrossEntropy,
-                      metrics=['accuracy', HierarchicalPartialLossModel.CumulatedAccuracy])
+                      metrics=[HierarchicalPartialLossModel.CumulatedAccuracy])
         return model
 
     def train_model(self, model, train_data, validation_data):
@@ -154,8 +156,10 @@ class HierarchicalPartialLossModel(BaseModel):
                     [[pos[0], pos1_int64 + 1]],
                     [tf.maximum(hierarchical[pos[0], pos1_int64 + 1], 1.0)]
                 )
-        return hierarchical
 
+        # Print the output tensor
+        tf.print("Output hierarchical label:", hierarchical, summarize=-1)
+        return hierarchical
     @staticmethod
     def CumulatedCrossEntropy(output, target, axis=-1):
         target_morphed = HierarchicalPartialLossModel.create_hierarchical_labels(target)
@@ -187,3 +191,4 @@ class HierarchicalPartialLossModel(BaseModel):
 
         accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
         return accuracy
+

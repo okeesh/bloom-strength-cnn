@@ -1,11 +1,12 @@
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 from keras.models import Model
 
 
 @dataclass
 class ModelConfig:
+    input_shape: Tuple[int, int, int] = (224, 224, 3)
     learning_rate: float = 0.001
     dropout_rate: float = 0.7
     batch_size: int = 32

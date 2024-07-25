@@ -15,11 +15,14 @@ class ClassificationModel(BaseModel):
         self.config = config
 
     def create_model(self):
+        for layer in self.config.pretrained_model.layers:
+            layer.trainable = False
+
         x = self.config.pretrained_model.output
         x = GlobalAveragePooling2D()(x)
         x = Dropout(self.config.dropout_rate)(x)
         x = Dense(self.config.dense_units, activation=self.config.activation, kernel_regularizer=l2(0.001))(x)
-        x = Dense(self.config.num_classes, activation='softmax')(x)
+        x = Dense(self.config.num_classes, activation='relu')(x)
 
         model = Model(inputs=self.config.pretrained_model.input, outputs=x)
         return model
@@ -32,10 +35,11 @@ class ClassificationModel(BaseModel):
 
     def train_model(self, model, train_data, validation_data):
         early_stopping = EarlyStopping(monitor='val_loss', patience=5)
-        model_checkpoint = ModelCheckpoint(filepath='best_classification_model.h5', monitor='val_loss', save_best_only=True)
+        model_checkpoint = ModelCheckpoint(filepath='best_classification_model.h5', monitor='val_loss',
+                                           save_best_only=True)
 
         history = model.fit(
-            train_data[0],  # train_images
+            train_data[0],  # train_images (now containing only the cropped regions)
             train_data[1],  # train_labels
             validation_data=validation_data,
             epochs=self.config.epochs,
