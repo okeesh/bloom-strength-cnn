@@ -1,3 +1,6 @@
+import tensorflow as tf
+tf.config.run_functions_eagerly(True)
+
 from keras.applications import MobileNetV2
 
 from dataset.load_data import load_data

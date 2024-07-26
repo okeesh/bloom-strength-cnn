@@ -157,11 +157,9 @@ class HierarchicalPartialLossModel(BaseModel):
                     [tf.maximum(hierarchical[pos[0], pos1_int64 + 1], 1.0)]
                 )
 
-        # Print the output tensor
-        tf.print("Output hierarchical label:", hierarchical, summarize=-1)
         return hierarchical
     @staticmethod
-    def CumulatedCrossEntropy(output, target, axis=-1):
+    def CumulatedCrossEntropy(target, output, axis=-1):
         target_morphed = HierarchicalPartialLossModel.create_hierarchical_labels(target)
         mask_wide = clip_by_value(target_morphed, 0, 1)
         mask_narrow = clip_by_value(target_morphed, 1, 2) - 1
@@ -172,11 +170,7 @@ class HierarchicalPartialLossModel(BaseModel):
         output_normalized = output / output_sum_epsilon
 
         epsilon_ = tf.keras.backend.epsilon()
-        return -math_ops.log(
-            clip_ops.clip_by_value(math_ops.reduce_sum(mask_wide * output_normalized, axis), epsilon_, 1. - epsilon_)) + \
-               -math_ops.log(
-                   clip_ops.clip_by_value(math_ops.reduce_sum(mask_narrow * output_normalized, axis), epsilon_,
-                                          1. - epsilon_))
+        return -math_ops.log(clip_ops.clip_by_value(math_ops.reduce_sum(mask_wide * output_normalized, axis), epsilon_, 1. - epsilon_)) + math_ops.log(clip_ops.clip_by_value(math_ops.reduce_sum(mask_narrow * output_normalized, axis), epsilon_,1. - epsilon_))
 
     @staticmethod
     def CumulatedAccuracy(y_true, y_pred, axis=-1):
