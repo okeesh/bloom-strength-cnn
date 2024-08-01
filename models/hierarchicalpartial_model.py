@@ -9,7 +9,6 @@ from keras.optimizers import Adam
 from tensorflow import clip_by_value
 from tensorflow.python.framework.indexed_slices import math_ops
 from tensorflow.python.ops import clip_ops
-
 from model_class.model_config import BaseModel, ModelConfig
 
 
@@ -32,7 +31,7 @@ class HierarchicalPartialLossModel(BaseModel):
     def compile_model(self, model):
         model.compile(optimizer=Adam(lr=self.config.learning_rate),
                       loss=HierarchicalPartialLossModel.CumulatedCrossEntropy,
-                      metrics=[HierarchicalPartialLossModel.CumulatedAccuracy])
+                      metrics=[HierarchicalPartialLossModel.CumulatedAccuracy, 'accuracy'])
         return model
 
     def train_model(self, model, train_data, validation_data):
@@ -42,6 +41,7 @@ class HierarchicalPartialLossModel(BaseModel):
         model_checkpoint = ModelCheckpoint(filepath=f'{experiment_directory}/best_hierarchical_model.h5',
                                            monitor='val_loss',
                                            save_best_only=True)
+
 
         history = model.fit(
             train_data[0],  # train_images
