@@ -10,6 +10,7 @@ from tensorflow import clip_by_value
 from tensorflow.python.framework.indexed_slices import math_ops
 from tensorflow.python.ops import clip_ops
 from model_class.model_config import BaseModel, ModelConfig
+from tensorflow import math
 
 
 class HierarchicalPartialLossModel(BaseModel):
@@ -160,6 +161,7 @@ class HierarchicalPartialLossModel(BaseModel):
         return hierarchical
     @staticmethod
     def CumulatedCrossEntropy(target, output, axis=-1):
+        # Labels endgültig einmal verändern und dann mit den veränderten arbeiten und nicht nur lokal ändern
         target_morphed = HierarchicalPartialLossModel.create_hierarchical_labels(target)
         mask_wide = clip_by_value(target_morphed, 0, 1)
         mask_narrow = clip_by_value(target_morphed, 1, 2) - 1
@@ -173,16 +175,14 @@ class HierarchicalPartialLossModel(BaseModel):
         return -math_ops.log(clip_ops.clip_by_value(math_ops.reduce_sum(mask_wide * output_normalized, axis), epsilon_, 1. - epsilon_)) + math_ops.log(clip_ops.clip_by_value(math_ops.reduce_sum(mask_narrow * output_normalized, axis), epsilon_,1. - epsilon_))
 
     @staticmethod
+
     def CumulatedAccuracy(y_true, y_pred, axis=-1):
-        y_true_argmax = tf.argmax(y_true, axis)
-        y_pred_argmax = tf.argmax(y_pred, axis)
-
-        y_true_float = tf.cast(y_true_argmax, tf.float32)
-        y_pred_float = tf.cast(y_pred_argmax, tf.float32)
-
-        diff = tf.abs(y_true_float - y_pred_float)
-        correct_predictions = tf.less_equal(diff, 1.0)
-
-        accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
+        max_value = tf.reduce_max(y_true)
+        mask_narrow = clip_by_value(y_true, max_value -1, max_value) - (max_value - 1)
+        truths = math.argmax(mask_narrow * (y_pred + 1), axis)  #max aller werte eingeschränkt auf die erlaubten positionen
+        preds = math.argmax(y_pred, axis) #max aller ausgaben
+        marks = math.equal(truths, preds) #ist max aller ausgaben auf einer erlaubten position?
+        accuracy = math_ops.reduce_mean(
+            tf.cast(marks, tf.float32))  # Der Prozentsatz der als zulässig klassifizierten Labels
         return accuracy
 

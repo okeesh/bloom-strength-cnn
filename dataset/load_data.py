@@ -34,6 +34,42 @@ def delete_saved_data(subdirectory='numpy_files'):
 
 
 def load_data(model_type='classification'):
+
+    def process_annotation_file(annotation_file, image_dir):
+        with open(annotation_file) as f:
+            coco_data = json.load(f)
+
+        annotations_info = coco_data["annotations"]
+        images_info = coco_data["images"]
+
+        image_id_to_info = {img["id"]: {"file_name": img["file_name"], "bbox": None} for img in images_info}
+
+        for annotation in annotations_info:
+            image_id = annotation["image_id"]
+            image_id_to_info[image_id]["bbox"] = annotation["bbox"]
+
+        processed_images = 0
+        ignored_images = 0
+
+        for image_id, info in image_id_to_info.items():
+            filename = info["file_name"]
+            bbox = info["bbox"]
+
+            bloom_strength = extract_bloom_strength(filename)
+
+            if bloom_strength is not None:
+                if bloom_strength != 0:  # Ignore images with bloom strength 0
+                    image_path = os.path.join(image_dir, filename)
+                    image_paths.append(image_path)
+                    labels.append(bloom_strength)
+                    bboxes.append(bbox)
+                    processed_images += 1
+                else:
+                    ignored_images += 1
+
+        return processed_images, ignored_images
+
+
     # Define the subdirectory for the numpy files
     subdirectory = os.path.join(SCRIPT_DIR, 'dataset', 'numpy_files')
     print(f"Numpy files directory: {subdirectory}")
@@ -77,6 +113,8 @@ def load_data(model_type='classification'):
         # Define paths for the datasets
         new_image_dir = os.path.join(SCRIPT_DIR, "dataset", "images_title_lable")
         new_annotation_file = os.path.join(SCRIPT_DIR, "dataset", "annotations", "new_annotations.json")
+        new_image_dir2 = os.path.join(SCRIPT_DIR, "dataset", "images_title_lable2")
+        new_annotation_file2 = os.path.join(SCRIPT_DIR, "dataset", "annotations", "new_annotations2.json")
         annotation_file = os.path.join(SCRIPT_DIR, "dataset", "annotations", "instances_Train.json")
 
         def extract_bloom_strength(filename):
@@ -135,42 +173,22 @@ def load_data(model_type='classification'):
 
         print(f"Loaded {original_images_count} images from original dataset")
 
-        # Process new dataset
-        new_images_count = 0
-        ignored_images_count = 0
+        # Process new datasets
+        new_datasets = [
+            (new_annotation_file, new_image_dir),
+            (new_annotation_file2, new_image_dir2)
+        ]
 
-        # Load the new COCO annotations
-        with open(new_annotation_file) as f:
-            new_coco_data = json.load(f)
+        total_new_images = 0
+        total_ignored_images = 0
 
-        new_annotations_info = new_coco_data["annotations"]
-        new_images_info = new_coco_data["images"]
+        for annotation_file, image_dir in new_datasets:
+            processed, ignored = process_annotation_file(annotation_file, image_dir)
+            total_new_images += processed
+            total_ignored_images += ignored
 
-        # Create a dictionary to map image IDs to filenames and bounding boxes
-        image_id_to_info = {img["id"]: {"file_name": img["file_name"], "bbox": None} for img in new_images_info}
-
-        for annotation in new_annotations_info:
-            image_id = annotation["image_id"]
-            image_id_to_info[image_id]["bbox"] = annotation["bbox"]
-
-        for image_id, info in image_id_to_info.items():
-            filename = info["file_name"]
-            bbox = info["bbox"]
-
-            bloom_strength = extract_bloom_strength(filename)
-
-            if bloom_strength is not None:
-                if bloom_strength != 0:  # Ignore images with bloom strength 0
-                    image_path = os.path.join(new_image_dir, filename)
-                    image_paths.append(image_path)
-                    labels.append(bloom_strength)
-                    bboxes.append(bbox)  # Now we're adding the bounding box for the new dataset
-                    new_images_count += 1
-                else:
-                    ignored_images_count += 1
-
-        print(f"Loaded {new_images_count} new images from {new_image_dir}")
-        print(f"Ignored {ignored_images_count} images with bloom strength 0")
+        print(f"Loaded {total_new_images} new images from new datasets")
+        print(f"Ignored {total_ignored_images} images with bloom strength 0")
         print(f"Total images now: {len(image_paths)}")
 
 
