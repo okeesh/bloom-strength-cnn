@@ -23,7 +23,7 @@ class HierarchicalPartialLossModel(BaseModel):
         x = self.config.pretrained_model.output
         x = GlobalAveragePooling2D()(x)
         x = Dropout(self.config.dropout_rate)(x)
-        x = Dense(self.config.dense_units, activation="relu", kernel_regularizer='l2')(x)
+        x = Dense(self.config.dense_units, activation="relu")(x)
         x = Dense(self.config.num_classes, activation="softmax")(x)
 
         model = Model(inputs=self.config.pretrained_model.input, outputs=x)
@@ -161,10 +161,8 @@ class HierarchicalPartialLossModel(BaseModel):
         return hierarchical
     @staticmethod
     def CumulatedCrossEntropy(target, output, axis=-1):
-        # Labels endgültig einmal verändern und dann mit den veränderten arbeiten und nicht nur lokal ändern
-        target_morphed = HierarchicalPartialLossModel.create_hierarchical_labels(target)
-        mask_wide = clip_by_value(target_morphed, 0, 1)
-        mask_narrow = clip_by_value(target_morphed, 1, 2) - 1
+        mask_wide = clip_by_value(target, 0, 1)
+        mask_narrow = clip_by_value(target, 1, 2) - 1
 
         output = tf.cast(output, tf.float32)
         output_sum = math_ops.reduce_sum(output, axis, keepdims=True)
@@ -172,7 +170,7 @@ class HierarchicalPartialLossModel(BaseModel):
         output_normalized = output / output_sum_epsilon
 
         epsilon_ = tf.keras.backend.epsilon()
-        return -math_ops.log(clip_ops.clip_by_value(math_ops.reduce_sum(mask_wide * output_normalized, axis), epsilon_, 1. - epsilon_)) + math_ops.log(clip_ops.clip_by_value(math_ops.reduce_sum(mask_narrow * output_normalized, axis), epsilon_,1. - epsilon_))
+        return -math_ops.log(clip_ops.clip_by_value(math_ops.reduce_sum(mask_wide * output, axis), epsilon_, 1. - epsilon_)) + -math_ops.log(clip_ops.clip_by_value(math_ops.reduce_sum(mask_narrow * output, axis), epsilon_, 1. - epsilon_))
 
     @staticmethod
 
