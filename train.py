@@ -12,14 +12,14 @@ input_shape = (224, 224, 3)
 
 config = ModelConfig(
     model_type='hierarchical',
-    learning_rate=0.001,
-    dropout_rate=0.1,
+    learning_rate=0.001,  # Reduced learning rate
+    dropout_rate=0.3,  # Slightly increased dropout
     batch_size=32,
-    epochs=50,
-    pretrained_model=MobileNet(weights='imagenet', include_top=False, input_shape=input_shape),
-    dense_units=512,
+    epochs=100,  # Increased number of epochs
+    pretrained_model=MobileNet(weights='imagenet', include_top=False, input_shape=(224, 224, 3)),
+    dense_units=1024,
     num_classes=9,
-    input_shape=input_shape  # Add this line to explicitly set input_shape
+    input_shape=(224, 224, 3)
 )
 
 model = ModelTrainer(config)

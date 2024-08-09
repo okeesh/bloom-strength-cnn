@@ -2,12 +2,16 @@ import os
 from datetime import datetime
 import matplotlib.pyplot as plt
 import tensorflow as tf
-from keras.callbacks import EarlyStopping, ModelCheckpoint
-from keras.layers import GlobalAveragePooling2D, Dropout, Dense
+from keras.backend import epsilon
+from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
+from keras.layers import GlobalAveragePooling2D, Dropout, Dense, BatchNormalization
 from keras.models import Model
 from keras.optimizers import Adam
+from keras.preprocessing.image import ImageDataGenerator
+from keras.regularizers import l2
 from tensorflow import clip_by_value
 from tensorflow.python.framework.indexed_slices import math_ops
+from tensorflow.python.framework.tensor_conversion_registry import constant_op
 from tensorflow.python.ops import clip_ops
 from model_class.model_config import BaseModel, ModelConfig
 from tensorflow import math
@@ -18,40 +22,50 @@ class HierarchicalPartialLossModel(BaseModel):
         self.config = config
 
     def create_model(self):
-        for layer in self.config.pretrained_model.layers:
-            layer.trainable = False
+        for layer in self.config.pretrained_model.layers[-20:]:
+            layer.trainable = True
         x = self.config.pretrained_model.output
         x = GlobalAveragePooling2D()(x)
+        x = BatchNormalization()(x)
         x = Dropout(self.config.dropout_rate)(x)
-        x = Dense(self.config.dense_units, activation="relu")(x)
+        x = Dense(self.config.dense_units, activation="relu", kernel_regularizer=l2(0.001))(x)
+        x = BatchNormalization()(x)
+        x = Dropout(self.config.dropout_rate - 0.1)(x)
+        x = Dense(512, activation="relu", kernel_regularizer=l2(0.001))(x)
+        x = BatchNormalization()(x)
+        x = Dropout(0.2)(x)
         x = Dense(self.config.num_classes, activation="softmax")(x)
 
         model = Model(inputs=self.config.pretrained_model.input, outputs=x)
         return model
-
     def compile_model(self, model):
         model.compile(optimizer=Adam(lr=self.config.learning_rate),
                       loss=HierarchicalPartialLossModel.CumulatedCrossEntropy,
-                      metrics=[HierarchicalPartialLossModel.CumulatedAccuracy, 'accuracy'])
+                      metrics=[HierarchicalPartialLossModel.CumulatedAccuracy])
         return model
 
     def train_model(self, model, train_data, validation_data):
         experiment_directory = self.create_experiment_directory()
 
-        early_stopping = EarlyStopping(monitor='val_loss', patience=5)
-        model_checkpoint = ModelCheckpoint(filepath=f'{experiment_directory}/best_hierarchical_model.h5',
-                                           monitor='val_loss',
-                                           save_best_only=True)
+        # Callbacks
+        reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, min_lr=1e-6)
+        #early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 
+        datagen = ImageDataGenerator(
+            rotation_range=20,
+            width_shift_range=0.2,
+            height_shift_range=0.2,
+            horizontal_flip=True,
+            zoom_range=0.2
+        )
 
         history = model.fit(
-            train_data[0],  # train_images
-            train_data[1],  # train_labels
+            datagen.flow(train_data[0], train_data[1], batch_size=self.config.batch_size),
             validation_data=validation_data,
             epochs=self.config.epochs,
             batch_size=self.config.batch_size,
             verbose=1,
-            callbacks=[early_stopping, model_checkpoint],
+            callbacks=[reduce_lr],
         )
 
         print(f"Final training accuracy: {history.history['accuracy'][-1]}")
@@ -59,8 +73,8 @@ class HierarchicalPartialLossModel(BaseModel):
         print(f"Final training custom metric: {history.history['CumulatedAccuracy'][-1]}")
         print(f"Final validation custom metric: {history.history['val_CumulatedAccuracy'][-1]}")
 
-        if early_stopping.stopped_epoch > 0:
-            print(f"Early stopped at epoch {early_stopping.stopped_epoch} with validation loss {early_stopping.best}")
+        # if early_stopping.stopped_epoch > 0:
+        #     print(f"Early stopped at epoch {early_stopping.stopped_epoch} with validation loss {early_stopping.best}")
 
         self.log_model_info(model, history, experiment_directory)
         return history
@@ -164,12 +178,9 @@ class HierarchicalPartialLossModel(BaseModel):
         mask_wide = clip_by_value(target, 0, 1)
         mask_narrow = clip_by_value(target, 1, 2) - 1
 
-        output = tf.cast(output, tf.float32)
-        output_sum = math_ops.reduce_sum(output, axis, keepdims=True)
-        output_sum_epsilon = output_sum + tf.keras.backend.epsilon()
-        output_normalized = output / output_sum_epsilon
+        output = output/(math_ops.reduce_sum(output, axis, True) + epsilon())
+        epsilon_ = constant_op.constant(epsilon(), dtype= output.dtype.base_dtype)
 
-        epsilon_ = tf.keras.backend.epsilon()
         return -math_ops.log(clip_ops.clip_by_value(math_ops.reduce_sum(mask_wide * output, axis), epsilon_, 1. - epsilon_)) + -math_ops.log(clip_ops.clip_by_value(math_ops.reduce_sum(mask_narrow * output, axis), epsilon_, 1. - epsilon_))
 
     @staticmethod
@@ -184,3 +195,13 @@ class HierarchicalPartialLossModel(BaseModel):
             tf.cast(marks, tf.float32))  # Der Prozentsatz der als zulässig klassifizierten Labels
         return accuracy
 
+    # def CumulatedAccuracy(y_true, y_pred, axis=-1):
+    #     truths = math.argmax(y_true * (y_pred + 1), axis)  #
+    #     preds = math.argmax(y_pred, axis)
+    #
+    #     marks = math.equal(truths, preds)
+    #
+    #     accuracy = math_ops.reduce_mean(
+    #         tf.cast(marks, tf.float32))  # Der Prozentsatz der als zulässig klassifizierten Labels
+    #     return accuracy
+    #
