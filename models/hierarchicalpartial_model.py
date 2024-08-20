@@ -182,7 +182,6 @@ class HierarchicalPartialLossModel(BaseModel):
         epsilon_ = constant_op.constant(epsilon(), dtype= output.dtype.base_dtype)
 
         return -math_ops.log(clip_ops.clip_by_value(math_ops.reduce_sum(mask_wide * output, axis), epsilon_, 1. - epsilon_)) + -math_ops.log(clip_ops.clip_by_value(math_ops.reduce_sum(mask_narrow * output, axis), epsilon_, 1. - epsilon_))
-
     @staticmethod
 
     def CumulatedAccuracy(y_true, y_pred, axis=-1):

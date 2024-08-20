@@ -11,7 +11,7 @@ from model_class.model_config import ModelConfig
 input_shape = (224, 224, 3)
 
 config = ModelConfig(
-    model_type='hierarchical',
+    model_type='regression',
     learning_rate=0.001,  # Reduced learning rate
     dropout_rate=0.3,  # Slightly increased dropout
     batch_size=32,
@@ -25,7 +25,8 @@ config = ModelConfig(
 model = ModelTrainer(config)
 
 # Load train and validation data from load_data
-train_images, train_labels, validation_images, validation_labels, class_weights = load_data(model_type='hierarchical')
+train_images, train_labels, validation_images, validation_labels, class_weights = load_data(model_type='regression')
+print(train_labels)
 train_data = (train_images, train_labels)  # Include class_weights in train_data
 validation_data = (validation_images, validation_labels)
 

@@ -28,8 +28,9 @@ class ClassificationModel(BaseModel):
         return model
 
     def compile_model(self, model):
+        focal_loss = CategoricalFocalLoss(alpha=0.5, gamma=5.0)
         model.compile(optimizer=Adam(lr=self.config.learning_rate),
-                      loss='categorical_crossentropy',
+                      loss=focal_loss,
                       metrics=['accuracy'])
         return model
 
@@ -106,3 +107,53 @@ class ClassificationModel(BaseModel):
             plt.savefig(f"{experiment_directory}/training_loss.png")
             plt.show()
 
+import tensorflow as tf
+from keras import backend as K
+from keras.losses import Loss
+
+class CategoricalFocalLoss(Loss):
+    def __init__(self, alpha=0.25, gamma=2.0, class_weights=None, from_logits=False, label_smoothing=0, **kwargs):
+        super().__init__(**kwargs)
+        self.alpha = alpha
+        self.gamma = gamma
+        self.class_weights = class_weights
+        self.from_logits = from_logits
+        self.label_smoothing = label_smoothing
+
+    def call(self, y_true, y_pred):
+        # Apply label smoothing if specified
+        y_true = y_true * (1.0 - self.label_smoothing) + (self.label_smoothing / y_true.shape[-1])
+
+        # If predictions are logits, apply softmax
+        if self.from_logits:
+            y_pred = tf.nn.softmax(y_pred, axis=-1)
+
+        # Clip the prediction value to prevent NaN's and Inf's
+        epsilon = K.epsilon()
+        y_pred = K.clip(y_pred, epsilon, 1. - epsilon)
+
+        # Calculate cross entropy
+        cross_entropy = -y_true * K.log(y_pred)
+
+        # Calculate focal loss
+        loss = self.alpha * K.pow(1 - y_pred, self.gamma) * cross_entropy
+
+        # Apply class weights if specified
+        if self.class_weights is not None:
+            loss = loss * tf.gather(self.class_weights, K.argmax(y_true, axis=-1))
+
+        # Sum over classes
+        loss = K.sum(loss, axis=-1)
+
+        return loss
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "alpha": self.alpha,
+            "gamma": self.gamma,
+            "class_weights": self.class_weights,
+            "from_logits": self.from_logits,
+            "label_smoothing": self.label_smoothing
+        })
+        return config

@@ -8,6 +8,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.utils import class_weight
 import matplotlib.pyplot as plt
 
+from models.hierarchicalpartial_model import HierarchicalPartialLossModel
+
 # Get the absolute path of the current script
 SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -34,41 +36,36 @@ def delete_saved_data(subdirectory='numpy_files'):
 
 
 def load_data(model_type='classification'):
-
     def process_annotation_file(annotation_file, image_dir):
         with open(annotation_file) as f:
             coco_data = json.load(f)
 
-        annotations_info = coco_data["annotations"]
-        images_info = coco_data["images"]
+        categories = {cat['id']: float(cat['name']) for cat in coco_data['categories'] if cat['name'] != 'tree'}
+        annotations = coco_data['annotations']
+        images = coco_data['images']
 
-        image_id_to_info = {img["id"]: {"file_name": img["file_name"], "bbox": None} for img in images_info}
+        image_paths = []
+        labels = []
+        bboxes = []
 
-        for annotation in annotations_info:
-            image_id = annotation["image_id"]
-            image_id_to_info[image_id]["bbox"] = annotation["bbox"]
+        for annotation in annotations:
+            image_id = annotation['image_id']
+            category_id = annotation['category_id']
+            bbox = annotation['bbox']
 
-        processed_images = 0
-        ignored_images = 0
+            if category_id in categories:
+                bloom_strength = categories[category_id]
+                image_info = next((img for img in images if img['id'] == image_id), None)
 
-        for image_id, info in image_id_to_info.items():
-            filename = info["file_name"]
-            bbox = info["bbox"]
-
-            bloom_strength = extract_bloom_strength(filename)
-
-            if bloom_strength is not None:
-                if bloom_strength != 0:  # Ignore images with bloom strength 0
-                    image_path = os.path.join(image_dir, filename)
+                if image_info:
+                    image_path = os.path.join(image_dir, image_info['file_name'])
                     image_paths.append(image_path)
                     labels.append(bloom_strength)
                     bboxes.append(bbox)
-                    processed_images += 1
-                else:
-                    ignored_images += 1
 
-        return processed_images, ignored_images
+        print(labels)
 
+        return image_paths, labels, bboxes
 
     # Define the subdirectory for the numpy files
     subdirectory = os.path.join(SCRIPT_DIR, 'dataset', 'numpy_files')
@@ -76,7 +73,7 @@ def load_data(model_type='classification'):
 
     # Define the prefix for the numpy files based on the model type
     if model_type != 'regression':
-        # works for classification and hierarchichal
+        # works for classification and hierarchical
         file_prefix = 'classification'
     else:
         # For 'regression', use the  prefix 'regression'
@@ -110,90 +107,14 @@ def load_data(model_type='classification'):
 
     # If any of the required data is not loaded, process the dataset
     if train_images is None or train_labels is None or validation_images is None or validation_labels is None:
-        # Define paths for the datasets
-        new_image_dir = os.path.join(SCRIPT_DIR, "dataset", "images_title_lable")
-        new_annotation_file = os.path.join(SCRIPT_DIR, "dataset", "annotations", "new_annotations.json")
-        new_image_dir2 = os.path.join(SCRIPT_DIR, "dataset", "images_title_lable2")
-        new_annotation_file2 = os.path.join(SCRIPT_DIR, "dataset", "annotations", "new_annotations2.json")
-        annotation_file = os.path.join(SCRIPT_DIR, "dataset", "annotations", "instances_Train.json")
+        image_dir = os.path.join(SCRIPT_DIR, "dataset", "allpics")
+        annotation_file = os.path.join(SCRIPT_DIR, "dataset", "allpics", "annotations", "instances_default.json")
 
-        def extract_bloom_strength(filename):
-            match = re.search(r'_(\d+\.\d+)_', filename)
-            if match:
-                bloom_strength = float(match.group(1))
-                return int(round(bloom_strength))
-            return None
-
-        def load_and_preprocess_image(image_path, bbox=None):
-            image = Image.open(image_path)
-            if bbox:
-                x, y, w, h = bbox
-                image = image.crop((x, y, x + w, y + h))
-            image = image.resize((224, 224))
-            image = img_to_array(image)
-            image = image / 255.0  # Normalize pixel values
-            return image
-
-        # Load the original annotation file
-        with open(annotation_file) as f:
-            coco_data = json.load(f)
-
-        images_info = coco_data["images"]
-        categories = coco_data["categories"]
-        annotations_info = coco_data["annotations"]
-
-        image_paths = []
-        labels = []
-        bboxes = []
-
-        # Process original dataset
-        original_images_count = 0
-        for annotation in annotations_info:
-            image_id = annotation["image_id"]
-            category_id = annotation["category_id"]
-            bbox = annotation["bbox"]
-
-            category_name = next((category["name"] for category in categories if category["id"] == category_id), None)
-
-            if category_name == "tree":
-                attributes = annotation["attributes"]
-                bloom_strength = attributes.get("bloom strenght")
-
-                if bloom_strength is not None and bloom_strength != 0:  # Ignore images with bloom strength 0
-                    image_path = next(
-                        (os.path.join(SCRIPT_DIR, "dataset", "images", image_info["file_name"]) for image_info in
-                         images_info if
-                         image_info["id"] == image_id), None)
-
-                    if image_path is not None:
-                        image_paths.append(image_path)
-                        labels.append(int(bloom_strength))
-                        bboxes.append(bbox)
-                        original_images_count += 1
-
-        print(f"Loaded {original_images_count} images from original dataset")
-
-        # Process new datasets
-        new_datasets = [
-            (new_annotation_file, new_image_dir),
-            (new_annotation_file2, new_image_dir2)
-        ]
-
-        total_new_images = 0
-        total_ignored_images = 0
-
-        for annotation_file, image_dir in new_datasets:
-            processed, ignored = process_annotation_file(annotation_file, image_dir)
-            total_new_images += processed
-            total_ignored_images += ignored
-
-        print(f"Loaded {total_new_images} new images from new datasets")
-        print(f"Ignored {total_ignored_images} images with bloom strength 0")
-        print(f"Total images now: {len(image_paths)}")
-
+        image_paths, labels, bboxes = process_annotation_file(annotation_file, image_dir)
 
         # Load and preprocess all images
         images = [load_and_preprocess_image(image_path, bbox) for image_path, bbox in zip(image_paths, bboxes)]
+        images = [img for img in images if img is not None]  # Remove any None values
         images = np.array(images)
         labels = np.array(labels)
 
@@ -214,23 +135,35 @@ def load_data(model_type='classification'):
         )
 
         # Process labels based on model type
-        if file_prefix == 'classification':
+        if model_type == 'classification':
             # Adjust labels and one-hot encode
             train_labels = train_labels - 1
             validation_labels = validation_labels - 1
             train_labels = to_categorical(train_labels, num_classes=9)
-            print("Sample train label after one-hot encoding:", train_labels[0])
             validation_labels = to_categorical(validation_labels, num_classes=9)
+            print("Sample train label after one-hot encoding:", train_labels[0])
+
 
             # Calculate class weights
             class_weights = class_weight.compute_class_weight('balanced',
                                                               classes=np.unique(np.argmax(train_labels, axis=1)),
                                                               y=np.argmax(train_labels, axis=1))
             class_weights = dict(enumerate(class_weights))
+        elif model_type == 'hierarchical':
+            # Adjust labels and one-hot encode
+            train_labels = train_labels - 1
+            validation_labels = validation_labels - 1
+            train_labels = to_categorical(train_labels, num_classes=9)
+            validation_labels = to_categorical(validation_labels, num_classes=9)
+            train_labels = HierarchicalPartialLossModel.create_hierarchical_labels(train_labels)
+            validation_labels = HierarchicalPartialLossModel.create_hierarchical_labels(validation_labels)
+            print("Sample train label after one-hot encoding:", train_labels[0])
+
         else:  # regression
-            train_labels = train_labels.reshape(-1, 1)
-            validation_labels = validation_labels.reshape(-1, 1)
-            class_weights = None
+                print("HIHIHIHIHI")
+                train_labels = train_labels.reshape(-1, 1)
+                validation_labels = validation_labels.reshape(-1, 1)
+                class_weights = None
 
         # Save processed data
         os.makedirs(subdirectory, exist_ok=True)
@@ -262,6 +195,21 @@ def load_data(model_type='classification'):
     plt.show()
 
     return train_images, train_labels, validation_images, validation_labels, class_weights
+
+
+def load_and_preprocess_image(image_path, bbox=None):
+    try:
+        image = Image.open(image_path)
+        if bbox:
+            x, y, w, h = bbox
+            image = image.crop((x, y, x + w, y + h))
+        image = image.resize((224, 224))
+        image = img_to_array(image)
+        image = image / 255.0  # Normalize pixel values
+        return image
+    except Exception as e:
+        print(f"Error processing image {image_path}: {str(e)}")
+        return None
 
 
 if __name__ == '__main__':
