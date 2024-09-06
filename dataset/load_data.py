@@ -94,7 +94,7 @@ def load_data(model_type='classification'):
     class_weights = None
 
     # Check if the numpy files exist
-    if os.path.exists(class_weights_np_file) and os.path.exists(train_images_np_file) and \
+    if os.path.exists(train_images_np_file) and \
             os.path.exists(train_labels_np_file) and os.path.exists(validation_images_np_file) and \
             os.path.exists(validation_labels_np_file):
         # Load the data from the numpy files
@@ -103,7 +103,6 @@ def load_data(model_type='classification'):
         train_labels = np.load(train_labels_np_file)
         validation_images = np.load(validation_images_np_file)
         validation_labels = np.load(validation_labels_np_file)
-        class_weights = np.load(class_weights_np_file, allow_pickle=True).item()
 
     # If any of the required data is not loaded, process the dataset
     if train_images is None or train_labels is None or validation_images is None or validation_labels is None:
@@ -137,6 +136,7 @@ def load_data(model_type='classification'):
         # Process labels based on model type
         if model_type == 'classification':
             # Adjust labels and one-hot encode
+            print("Loading Classification Labels")
             train_labels = train_labels - 1
             validation_labels = validation_labels - 1
             train_labels = to_categorical(train_labels, num_classes=9)
@@ -150,6 +150,7 @@ def load_data(model_type='classification'):
                                                               y=np.argmax(train_labels, axis=1))
             class_weights = dict(enumerate(class_weights))
         elif model_type == 'hierarchical':
+            print("Creating Hierarchical Labels..")
             # Adjust labels and one-hot encode
             train_labels = train_labels - 1
             validation_labels = validation_labels - 1
@@ -160,7 +161,7 @@ def load_data(model_type='classification'):
             print("Sample train label after one-hot encoding:", train_labels[0])
 
         else:  # regression
-                print("HIHIHIHIHI")
+                print("Loading Regression Labels..")
                 train_labels = train_labels.reshape(-1, 1)
                 validation_labels = validation_labels.reshape(-1, 1)
                 class_weights = None
@@ -174,7 +175,8 @@ def load_data(model_type='classification'):
         if class_weights is not None:
             np.save(class_weights_np_file, class_weights)
 
-    print("Data processing and saving completed.")
+
+        print("Data processing and saving completed.")
 
     # Print summary statistics
     print("Data Summary:")

@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 import matplotlib.pyplot as plt
+import numpy as np
 import tensorflow as tf
 from keras.backend import epsilon
 from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
@@ -22,18 +23,11 @@ class HierarchicalPartialLossModel(BaseModel):
         self.config = config
 
     def create_model(self):
-        for layer in self.config.pretrained_model.layers[-20:]:
-            layer.trainable = True
+        for layer in self.config.pretrained_model.layers:
+            layer.trainable = False
+
         x = self.config.pretrained_model.output
         x = GlobalAveragePooling2D()(x)
-        x = BatchNormalization()(x)
-        x = Dropout(self.config.dropout_rate)(x)
-        x = Dense(self.config.dense_units, activation="relu", kernel_regularizer=l2(0.001))(x)
-        x = BatchNormalization()(x)
-        x = Dropout(self.config.dropout_rate - 0.1)(x)
-        x = Dense(512, activation="relu", kernel_regularizer=l2(0.001))(x)
-        x = BatchNormalization()(x)
-        x = Dropout(0.2)(x)
         x = Dense(self.config.num_classes, activation="softmax")(x)
 
         model = Model(inputs=self.config.pretrained_model.input, outputs=x)
@@ -41,7 +35,7 @@ class HierarchicalPartialLossModel(BaseModel):
     def compile_model(self, model):
         model.compile(optimizer=Adam(lr=self.config.learning_rate),
                       loss=HierarchicalPartialLossModel.CumulatedCrossEntropy,
-                      metrics=[HierarchicalPartialLossModel.CumulatedAccuracy])
+                      metrics=[HierarchicalPartialLossModel.CumulatedAccuracy, 'accuracy'])
         return model
 
     def train_model(self, model, train_data, validation_data):
@@ -49,7 +43,6 @@ class HierarchicalPartialLossModel(BaseModel):
 
         # Callbacks
         reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, min_lr=1e-6)
-        #early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 
         datagen = ImageDataGenerator(
             rotation_range=20,
@@ -73,8 +66,11 @@ class HierarchicalPartialLossModel(BaseModel):
         print(f"Final training custom metric: {history.history['CumulatedAccuracy'][-1]}")
         print(f"Final validation custom metric: {history.history['val_CumulatedAccuracy'][-1]}")
 
-        # if early_stopping.stopped_epoch > 0:
-        #     print(f"Early stopped at epoch {early_stopping.stopped_epoch} with validation loss {early_stopping.best}")
+        # Plot confusion matrix
+        y_pred = np.argmax(model.predict(validation_data[0]), axis=1)
+        y_true = np.argmax(validation_data[1], axis=1)
+        classes = [f'Class {i}' for i in range(self.config.num_classes)]
+        self.plot_confusion_matrix(y_true, y_pred, classes, f'{experiment_directory}/hierarchical_confusion_matrix.png')
 
         self.log_model_info(model, history, experiment_directory)
         return history
@@ -175,15 +171,15 @@ class HierarchicalPartialLossModel(BaseModel):
         return hierarchical
     @staticmethod
     def CumulatedCrossEntropy(target, output, axis=-1):
-        mask_wide = clip_by_value(target, 0, 1)
-        mask_narrow = clip_by_value(target, 1, 2) - 1
+        mask_wide = clip_by_value(target, 0, 1)#         [0, 0, 0 , 0 , 0 , 1, 1, 1,0]
+        mask_narrow = clip_by_value(target, 1, 2) - 1# [0, 0 , 0 , 0 , 0 , 0, 1 ,0 ,0]
 
         output = output/(math_ops.reduce_sum(output, axis, True) + epsilon())
         epsilon_ = constant_op.constant(epsilon(), dtype= output.dtype.base_dtype)
 
         return -math_ops.log(clip_ops.clip_by_value(math_ops.reduce_sum(mask_wide * output, axis), epsilon_, 1. - epsilon_)) + -math_ops.log(clip_ops.clip_by_value(math_ops.reduce_sum(mask_narrow * output, axis), epsilon_, 1. - epsilon_))
-    @staticmethod
 
+    @staticmethod
     def CumulatedAccuracy(y_true, y_pred, axis=-1):
         max_value = tf.reduce_max(y_true)
         mask_narrow = clip_by_value(y_true, max_value -1, max_value) - (max_value - 1)

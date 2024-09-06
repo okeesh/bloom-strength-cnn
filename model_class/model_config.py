@@ -2,7 +2,9 @@ from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from typing import Optional, Tuple
 from keras.models import Model
-
+from matplotlib import pyplot as plt
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
 
 @dataclass
 class ModelConfig:
@@ -12,6 +14,7 @@ class ModelConfig:
     batch_size: int = 32
     epochs: int = 50
     dense_units: int = 256
+    regularization_rate: float = 0.001
     model_type: str = 'regression'
     pretrained_model: Optional[Model] = None
     activation: str = 'relu'
@@ -36,15 +39,26 @@ class ModelConfig:
             raise ValueError("num_classes must be specified for classification models")
 
 
+
 class BaseModel(ABC):
     @abstractmethod
     def create_model(self):
         pass
 
     @abstractmethod
-    def compile_model(self, model):
+    def compile_model(self):
         pass
 
     @abstractmethod
     def train_model(self, model, train_data, validation_data):
         pass
+
+    def plot_confusion_matrix(self, y_true, y_pred, classes, filename):
+        cm = confusion_matrix(y_true, y_pred)
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=classes, yticklabels=classes)
+        plt.title('Confusion Matrix')
+        plt.ylabel('True Label')
+        plt.xlabel('Predicted Label')
+        plt.savefig(filename)
+        plt.close()

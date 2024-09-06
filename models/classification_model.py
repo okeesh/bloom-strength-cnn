@@ -1,10 +1,12 @@
 import os
 from datetime import datetime
 
-from keras.callbacks import EarlyStopping, ModelCheckpoint
+import numpy as np
+from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from keras.layers import Dense, GlobalAveragePooling2D, Dropout
 from keras.models import Model
 from keras.optimizers import Adam
+from keras.preprocessing.image import ImageDataGenerator
 from keras.regularizers import l2
 from matplotlib import pyplot as plt
 from model_class.model_config import ModelConfig, BaseModel
@@ -21,33 +23,51 @@ class ClassificationModel(BaseModel):
         x = self.config.pretrained_model.output
         x = GlobalAveragePooling2D()(x)
         x = Dropout(self.config.dropout_rate)(x)
-        x = Dense(self.config.dense_units, activation=self.config.activation, kernel_regularizer=l2(0.001))(x)
-        x = Dense(self.config.num_classes, activation='relu')(x)
+        x = Dense(self.config.dense_units, activation='relu', kernel_regularizer=l2(self.config.learning_rate))(x)
+        x = Dense(self.config.num_classes, activation='softmax')(x)
 
         model = Model(inputs=self.config.pretrained_model.input, outputs=x)
         return model
 
     def compile_model(self, model):
-        focal_loss = CategoricalFocalLoss(alpha=0.5, gamma=5.0)
+        focal_loss = CategoricalFocalLoss(alpha=0.5, gamma=1.0)
         model.compile(optimizer=Adam(lr=self.config.learning_rate),
-                      loss=focal_loss,
+                      # loss=focal_loss,
+                        loss='categorical_crossentropy',
                       metrics=['accuracy'])
         return model
 
     def train_model(self, model, train_data, validation_data):
+        experiment_directory = self.create_experiment_directory()
+
+
         early_stopping = EarlyStopping(monitor='val_loss', patience=5)
         model_checkpoint = ModelCheckpoint(filepath='best_classification_model.h5', monitor='val_loss',
                                            save_best_only=True)
 
+        if len(train_data) > 2:
+            print("Using class weights")
+
+        datagen = ImageDataGenerator(
+            rotation_range=20,
+            width_shift_range=0.2,
+            height_shift_range=0.2,
+            horizontal_flip=True,
+            zoom_range=0.2
+        )
+
+        # Callbacks
+        reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, min_lr=1e-6)
+
+
         history = model.fit(
-            train_data[0],  # train_images (now containing only the cropped regions)
-            train_data[1],  # train_labels
+            datagen.flow(train_data[0],  train_data[1],  batch_size=self.config.batch_size),  # train_images (now containing only the cropped regions)
             validation_data=validation_data,
             epochs=self.config.epochs,
-            batch_size=self.config.batch_size,
-            verbose=1,
-            callbacks=[early_stopping, model_checkpoint],
-            class_weight=train_data[2] if len(train_data) > 2 else None  # class_weights if provided
+            #batch_size=self.config.batch_size,
+            #verbose=1,
+            callbacks=[early_stopping, reduce_lr],
+            class_weight=train_data[2] if len(train_data) > 2 else None
         )
 
         # Give a final print for the training
@@ -58,10 +78,16 @@ class ClassificationModel(BaseModel):
         if early_stopping.stopped_epoch > 0:
             print(f"Early stopped at epoch {early_stopping.stopped_epoch} with validation loss {early_stopping.best}")
 
+        # Plot confusion matrix
+        y_pred = np.argmax(model.predict(validation_data[0]), axis=1)
+        y_true = np.argmax(validation_data[1], axis=1)
+        classes = [f'Class {i}' for i in range(self.config.num_classes)]
+        self.plot_confusion_matrix(y_true, y_pred, classes, f'{experiment_directory}/classification_confusion_matrix.png')
+
         return history
 
     def create_experiment_directory(self):
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        timestamp = datetime.now().strftime("%m-%d_%H-%M")
         experiment_directory = f"experiments/classification/classification_{self.config.pretrained_model.name}_{timestamp}"
         os.makedirs(experiment_directory, exist_ok=True)
         return experiment_directory
