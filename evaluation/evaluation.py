@@ -41,7 +41,7 @@ def print_menu():
 
 def calculate_metrics(folder_name):
     """
-    Calculate MAE, MSE, Accuracy, and Balanced Accuracy metrics from the JSON file and save them to text files.
+    Calculate MAE, MSE, Accuracy, Balanced Accuracy, and Cumulated Accuracy metrics from the JSON file.
     """
     # Read the JSON file
     file_path = os.path.join('evaluate', folder_name, 'results.json')
@@ -55,15 +55,21 @@ def calculate_metrics(folder_name):
 
     # Handle different model types
     if model_type in ['hierarchical', 'classification']:
-        # Get predicted and true classes
+        # Get predicted and true classes for standard metrics
         pred_classes = np.argmax(predictions, axis=1) + 1
         true_classes = np.argmax(true_labels, axis=1) + 1
 
-        # Calculate metrics
+        # Calculate standard metrics
         mae = np.mean(np.abs(pred_classes - true_classes))
         mse = np.mean((pred_classes - true_classes) ** 2)
         accuracy = np.mean(pred_classes == true_classes)
         balanced_acc = balanced_accuracy_score(true_classes, pred_classes)
+
+        # Calculate cumulated accuracy using the hierarchical approach
+        mask_wide = (true_labels > 0).astype(np.float32)  # Create mask for valid positions
+        truths = np.argmax(mask_wide * (predictions + 1), axis=1)
+        preds = np.argmax(predictions, axis=1)
+        cumulated_acc = np.mean(truths == preds)
 
     else:  # regression
         # Flatten arrays properly - predictions are in shape (n, 1)
@@ -79,17 +85,18 @@ def calculate_metrics(folder_name):
         accuracy = np.mean(rounded_preds == true_values)
 
         # For balanced accuracy with regression
-        # First get unique classes from true values
         unique_classes = np.unique(true_values)
         class_accuracies = []
-
         for cls in unique_classes:
             mask = (true_values == cls)
             if np.sum(mask) > 0:
                 class_accuracy = np.mean(rounded_preds[mask] == cls)
                 class_accuracies.append(class_accuracy)
-
         balanced_acc = np.mean(class_accuracies)
+
+        # For regression, we'll still use the ±1 criterion for cumulated accuracy
+        diff = np.abs(rounded_preds - true_values)
+        cumulated_acc = np.mean(diff <= 1)
 
     # Create metrics directory
     metrics_dir = os.path.join('evaluate', folder_name, 'metrics')
@@ -100,7 +107,8 @@ def calculate_metrics(folder_name):
         'MAE': mae,
         'MSE': mse,
         'ACC': accuracy,
-        'BAC': balanced_acc
+        'BAC': balanced_acc,
+        'CAC': cumulated_acc
     }
 
     # Save all metrics to their respective files
@@ -118,8 +126,10 @@ def calculate_metrics(folder_name):
     print(f"MSE: {mse:.4f}")
     print(f"Accuracy: {accuracy:.4f}")
     print(f"Balanced Accuracy: {balanced_acc:.4f}")
+    print(f"Cumulated Accuracy: {cumulated_acc:.4f}")
 
     return metrics
+
 
 def select_folder():
     print("\nChoose the folder to evaluate:")
