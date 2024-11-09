@@ -21,29 +21,33 @@ def print_error(text):
 
 def get_standard_limits():
     """
-    Define standard y-axis limits for each metric type based on actual value ranges
+    Definiert Standard-Grenzen für verschiedene Metriken.
+
+    Returns:
+        dict: Dictionary mit Min/Max-Werten für jede Metrik
     """
     return {
         'mse': {
-            'min': 1.0,  # Never below 1.5, but giving some padding
-            'max': 5.0  # Never above 3.0
+            'min': 1.0,  # 10^0
+            'max': 10.0  # 10^1
         },
         'mae': {
-            'min': 0.5,  # Never below 0.8
-            'max': 5.0  # Never above 2.0, giving some padding
+            'min': 0.5,  # 5*10^-1
+            'max': 5.0  # 5*10^0
         },
         'accuracy': {
             'min': 0.0,
-            'max': 1.0  # Natural limits for accuracy
+            'max': 1.0
         }
     }
 
 
 def plot_training_curves(folder_name):
     """
-    Plot training and validation curves with optimized scales.
+    Plot training and validation curves with loglinear scale and standard limits
     """
     import matplotlib.pyplot as plt
+    import numpy as np
 
     # Read the JSON file
     file_path = os.path.join('evaluate', folder_name, 'results.json')
@@ -60,24 +64,23 @@ def plot_training_curves(folder_name):
     # Set style for all plots
     plt.style.use('seaborn')
 
-    # Plot MSE and MAE
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12))
+    # Plot MSE with semilogy
+    plt.figure(figsize=(10, 6))
+    plt.semilogy(data['history']['loss'], label='Training MSE', color='blue')
+    plt.semilogy(data['history']['val_loss'], label='Validierung MSE', color='orange')
+    plt.title('Training und Validierung MSE')
+    plt.xlabel('Epoche')
+    plt.ylabel('MSE')
+    plt.legend()
+    plt.grid(True)
+    plt.ylim(limits['mse']['min'], limits['mse']['max'])
+    plt.minorticks_on()
+    plt.grid(True, which='minor', linestyle=':', alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, 'mse_curve.png'), dpi=300, bbox_inches='tight')
+    plt.close()
 
-    # MSE plot
-    ax1.plot(data['history']['loss'], label='Training MSE', color='blue')
-    ax1.plot(data['history']['val_loss'], label='Validierung MSE', color='orange')
-    ax1.set_title('Training und Validierung MSE')
-    ax1.set_xlabel('Epoche')
-    ax1.set_ylabel('MSE')
-    ax1.legend()
-    ax1.grid(True)
-    ax1.set_ylim(limits['mse']['min'], limits['mse']['max'])
-
-    # Add minor gridlines for better readability given the smaller scale
-    ax1.minorticks_on()
-    ax1.grid(True, which='minor', linestyle=':', alpha=0.5)
-
-    # MAE plot
+    # Plot MAE with semilogy
     if 'mae' in data['history']:
         train_mae = data['history']['mae']
         val_mae = data['history']['val_mae']
@@ -86,24 +89,22 @@ def plot_training_curves(folder_name):
         train_mae = np.sqrt(data['history']['loss'])
         val_mae = np.sqrt(data['history']['val_loss'])
 
-    ax2.plot(train_mae, label='Training MAE', color='blue')
-    ax2.plot(val_mae, label='Validierung MAE', color='orange')
-    ax2.set_title('Training und Validierung MAE')
-    ax2.set_xlabel('Epoche')
-    ax2.set_ylabel('MAE')
-    ax2.legend()
-    ax2.grid(True)
-    ax2.set_ylim(limits['mae']['min'], limits['mae']['max'])
-
-    # Add minor gridlines for better readability
-    ax2.minorticks_on()
-    ax2.grid(True, which='minor', linestyle=':', alpha=0.5)
-
+    plt.figure(figsize=(10, 6))
+    plt.semilogy(train_mae, label='Training MAE', color='blue')
+    plt.semilogy(val_mae, label='Validierung MAE', color='orange')
+    plt.title('Training und Validierung MAE')
+    plt.xlabel('Epoche')
+    plt.ylabel('MAE')
+    plt.legend()
+    plt.grid(True)
+    plt.ylim(limits['mae']['min'], limits['mae']['max'])
+    plt.minorticks_on()
+    plt.grid(True, which='minor', linestyle=':', alpha=0.5)
     plt.tight_layout()
-    plt.savefig(os.path.join(plots_dir, 'mae_mse_curves.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(plots_dir, 'mae_curve.png'), dpi=300, bbox_inches='tight')
     plt.close()
 
-    # Plot Standard Accuracy
+    # Plot Standard Accuracy (linear scale)
     if 'accuracy' in data['history']:
         plt.figure(figsize=(10, 6))
         plt.plot(data['history']['accuracy'], label='Training Accuracy', color='blue')
@@ -111,14 +112,13 @@ def plot_training_curves(folder_name):
         plt.title('Training und Validierung Accuracy')
         plt.xlabel('Epoche')
         plt.ylabel('Accuracy')
-        plt.legend()
+        plt.legend(['Training', 'Validierung'], loc='upper right')
         plt.grid(True)
         plt.ylim(limits['accuracy']['min'], limits['accuracy']['max'])
-        plt.tight_layout()
         plt.savefig(os.path.join(plots_dir, 'accuracy_curve.png'), dpi=300, bbox_inches='tight')
         plt.close()
 
-    # Plot Cumulated Accuracy
+    # Plot Cumulated Accuracy (linear scale)
     if 'CumulatedAccuracy' in data['history']:
         plt.figure(figsize=(10, 6))
         plt.plot(data['history']['CumulatedAccuracy'], label='Training Cumulated Accuracy', color='blue')
@@ -160,7 +160,8 @@ def print_menu():
 
 def plot_confusion_matrix(folder_name):
     """
-    Erstellt und speichert Standard und Cumulated Confusion Matrices als separate Dateien.
+    Erstellt und speichert die Standard Confusion Matrix als separate Datei.
+    Unterstützt sowohl Regressions- als auch Klassifikationsmodelle.
     """
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -186,54 +187,33 @@ def plot_confusion_matrix(folder_name):
         pred_classes = np.argmax(predictions, axis=1) + 1
         true_classes = np.argmax(true_labels, axis=1) + 1
     else:  # regression
-        pred_classes = np.round(np.array([p[0] for p in predictions])).astype(int)
-        true_classes = np.round(np.array([t[0] for t in true_labels])).astype(int)
+        # Stelle sicher, dass die Werte zwischen 1 und 9 liegen
+        pred_values = np.array([p[0] for p in predictions])
+        true_values = np.array([t[0] for t in true_labels])
+
+        # Runde auf nächste ganze Zahl und beschränke auf gültige Werte
+        pred_classes = np.clip(np.round(pred_values), 1, 9).astype(int)
+        true_classes = np.clip(np.round(true_values), 1, 9).astype(int)
 
     # Standard Confusion Matrix
     plt.figure(figsize=(12, 10))
-    cm = confusion_matrix(true_classes, pred_classes)
-    cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+    cm = confusion_matrix(true_classes, pred_classes, labels=range(1, 10))
+
+    # Normalisierung mit Behandlung von Null-Zeilen
+    row_sums = cm.sum(axis=1)
+    cm_normalized = np.zeros_like(cm, dtype=float)
+    for i in range(cm.shape[0]):
+        if row_sums[i] > 0:
+            cm_normalized[i] = cm[i] / row_sums[i]
 
     sns.heatmap(cm_normalized, annot=cm, fmt='d', cmap='Blues',
-                xticklabels=range(1,10), yticklabels=range(1,10))
-    plt.title(f'Confusion Matrix - {model_type.capitalize()} Modell\n' +
-             f'Genauigkeit: {np.sum(np.diag(cm))/np.sum(cm):.4f}')
+                xticklabels=range(1, 10), yticklabels=range(1, 10),
+                cbar_kws={'label': 'Anteil der Vorhersagen'})
     plt.xlabel('Vorhergesagte Blühstärke')
     plt.ylabel('Tatsächliche Blühstärke')
     plt.tight_layout()
     plt.savefig(os.path.join(plots_dir, 'confusion_matrix_standard.png'), dpi=300, bbox_inches='tight')
     plt.close()
-
-    # Cumulated Confusion Matrix (±1 Toleranz)
-    plt.figure(figsize=(12, 10))
-    n_classes = 9
-    cm_cumulated = np.zeros((n_classes, n_classes))
-
-    for i in range(len(true_classes)):
-        true_idx = true_classes[i] - 1
-        pred_idx = pred_classes[i] - 1
-
-        # Markiere Vorhersage als korrekt wenn innerhalb ±1
-        if abs(true_idx - pred_idx) <= 1:
-            cm_cumulated[true_idx, true_idx] += 1
-        else:
-            cm_cumulated[true_idx, pred_idx] += 1
-
-    cm_cumulated_normalized = cm_cumulated.astype('float') / cm_cumulated.sum(axis=1)[:, np.newaxis]
-
-    sns.heatmap(cm_cumulated_normalized, annot=cm_cumulated.astype(int), fmt='d', cmap='Blues',
-                xticklabels=range(1,10), yticklabels=range(1,10))
-    plt.title(f'Confusion Matrix mit ±1 Toleranz - {model_type.capitalize()} Modell\n' +
-             f'Kumulative Genauigkeit: {np.sum(np.diag(cm_cumulated))/np.sum(cm_cumulated):.4f}')
-    plt.xlabel('Vorhergesagte Blühstärke')
-    plt.ylabel('Tatsächliche Blühstärke')
-    plt.tight_layout()
-    plt.savefig(os.path.join(plots_dir, 'confusion_matrix_cumulated.png'), dpi=300, bbox_inches='tight')
-    plt.close()
-
-    # Speichere numerische Matrizen
-    np.savetxt(os.path.join(plots_dir, 'confusion_matrix_standard.txt'), cm, fmt='%d')
-    np.savetxt(os.path.join(plots_dir, 'confusion_matrix_cumulated.txt'), cm_cumulated, fmt='%d')
 
     return plots_dir
 
