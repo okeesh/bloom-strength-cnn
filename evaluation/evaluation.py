@@ -119,16 +119,16 @@ def plot_experiment_comparison():
     # Vollständige Daten aus der Analyse
     data = {
         'Klassifikation': {
-            'ResNet': {'acc': 38.50, 'mae': 1.48, 'mse': 2.31},
-            'MobileNet': {'acc': 39.67, 'mae': 1.09, 'mse': 1.96}
+            'ResNet': {'acc': 38.50, 'mae': 1.46, 'mse': 5.28}, #  für acc fertig
+            'MobileNet': {'acc': 39.67, 'mae': 1.07, 'mse': 2.54} #fertig
         },
         'Regression': {
-            'ResNet': {'acc': 35.20, 'mae': 1.52, 'mse': 2.45},
-            'MobileNet': {'acc': 37.80, 'mae': 1.09, 'mse': 1.96}
+            'ResNet': {'acc': 16.67, 'mae': 1.53, 'mse': 3.29}, # fertig
+            'MobileNet': {'acc': 32.86, 'mae': 1.086, 'mse': 1.96} #fertig
         },
-        'Hierarchisch': {
-            'ResNet': {'acc': 75.90, 'mae': 0.89, 'mse': 1.15},
-            'MobileNet': {'acc': 80.76, 'mae': 0.75, 'mse': 0.98}
+        'Hierarchical PLL': {
+            'ResNet': {'acc': 38.01, 'cum_acc': 75.73, 'mae': 1.14, 'mse': 3.11},  # Updated mit echtem MSE fert
+            'MobileNet': {'acc': 40.14, 'cum_acc': 80.28, 'mae': 0.9507, 'mse': 2.15}  # Beispielwerte für acc fertig
         }
     }
 
@@ -139,22 +139,42 @@ def plot_experiment_comparison():
     fig_acc, ax_acc = plt.subplots(figsize=(15, 8))
     x_acc = np.arange(len(experiments))
 
+    # Plot standard accuracy bars
     for i, exp in enumerate(experiments):
         resnet_val = data[exp]['ResNet']['acc']
         mobilenet_val = data[exp]['MobileNet']['acc']
 
+        # Plot standard accuracy
         resnet_bar = ax_acc.bar(x_acc[i] - width / 2, resnet_val, width,
                                 color=plt.cm.Set2(0))
         mobilenet_bar = ax_acc.bar(x_acc[i] + width / 2, mobilenet_val, width,
                                    color=plt.cm.Set2(1))
 
+        # Add labels for standard accuracy
         ax_acc.text(x_acc[i] - width / 2, resnet_val, f'ResNet\n{resnet_val:.2f}',
                     ha='center', va='bottom', fontsize=8)
         ax_acc.text(x_acc[i] + width / 2, mobilenet_val, f'MobileNet\n{mobilenet_val:.2f}',
                     ha='center', va='bottom', fontsize=8)
 
+        # For hierarchical model, add cumulated accuracy as a lighter bar on top
+        if exp == 'Hierarchical PLL':
+            resnet_cum = data[exp]['ResNet']['cum_acc']
+            mobilenet_cum = data[exp]['MobileNet']['cum_acc']
+
+            # Plot cumulated accuracy with pattern
+            resnet_cum_bar = ax_acc.bar(x_acc[i] - width / 2, resnet_cum - resnet_val, width,
+                                        bottom=resnet_val, color=plt.cm.Set2(0), alpha=0.5)
+            mobilenet_cum_bar = ax_acc.bar(x_acc[i] + width / 2, mobilenet_cum - mobilenet_val, width,
+                               bottom=mobilenet_val, color=plt.cm.Set2(1), alpha=0.5)
+
+            # Add labels for cumulated accuracy
+            ax_acc.text(x_acc[i] - width / 2, resnet_cum, f'Cumulated Accuracy.: {resnet_cum:.2f}',
+                        ha='center', va='bottom', fontsize=8)
+            ax_acc.text(x_acc[i] + width / 2, mobilenet_cum, f'Cumulated Accuracy.: {mobilenet_cum:.2f}',
+                        ha='center', va='bottom', fontsize=8)
+
     ax_acc.set_ylabel('Genauigkeit')
-    ax_acc.set_title('Vergleich der Genauigkeit: ResNet vs MobileNet')
+    ax_acc.set_title('Vergleich der Genauigkeit in den Basisexperimenten: ResNet vs MobileNet')
     ax_acc.set_xticks(x_acc)
     ax_acc.set_xticklabels(experiments)
     ax_acc.grid(True, linestyle='--', alpha=0.7)
@@ -162,7 +182,7 @@ def plot_experiment_comparison():
     plt.savefig('experiment_comparison_accuracy.png', bbox_inches='tight', dpi=300)
     plt.close()
 
-    # 2. Plot MAE and MSE (linear scale)
+    # 2. Plot MAE and MSE wie gehabt...
     metrics = ['mae', 'mse']
     metric_names = ['MAE', 'MSE']
     x_err = np.arange(len(experiments) * 2)
@@ -196,12 +216,10 @@ def plot_experiment_comparison():
     ax_err.set_xticklabels(labels, rotation=0)
 
     ax_err.grid(True, linestyle='--', alpha=0.7)
-    # Setze die Y-Achsen-Grenzen auf sinnvolle Werte für lineare Skala
-    ax_err.set_ylim(0, 3)  # Angepasst für lineare Skala
+    ax_err.set_ylim(0, 3)
     plt.tight_layout()
     plt.savefig('experiment_comparison_errors.png', bbox_inches='tight', dpi=300)
     plt.close()
-
 
 
 
