@@ -1,22 +1,10 @@
 import json
 import os
 import numpy as np
+from matplotlib import pyplot as plt
 from sklearn.metrics import balanced_accuracy_score
 import time
 
-
-def print_header():
-    print("\n" + "=" * 50)
-    print("🔍 Bloom Strength Evaluation Tool".center(50))
-    print("=" * 50 + "\n")
-
-
-def print_success(text):
-    print(f"\n✅ {text}")
-
-
-def print_error(text):
-    print(f"\n❌ {text}")
 
 
 def get_standard_limits():
@@ -40,6 +28,181 @@ def get_standard_limits():
             'max': 1.0
         }
     }
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+import numpy as np
+import matplotlib.pyplot as plt
+import json
+
+
+def plot_regression_scatter(folder_name):
+    """
+    Erstellt ein Streudiagramm der Vorhersagen vs. tatsächliche Werte
+    mit perfekter Vorhersagelinie und ±2 Toleranzlinien
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # JSON Datei einlesen
+    file_path = os.path.join('evaluate', folder_name, 'results.json')
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+
+    # Verzeichnis erstellen
+    plots_dir = os.path.join('evaluate', folder_name, 'plots')
+    os.makedirs(plots_dir, exist_ok=True)
+
+    # Daten vorbereiten
+    pred = np.array([p[0] for p in data['predictions']])
+    true = np.array([t[0] for t in data['true_labels']])
+
+    # Plot erstellen mit größerer Figur
+    plt.figure(figsize=(16, 12))
+
+    # Streudiagramm
+    plt.scatter(true, pred, alpha=0.5, color='blue', s=100)  # Größere Punkte
+
+    # Dynamische Grenzen berechnen mit etwas Padding
+    min_val = min(min(true), min(pred)) - 0.5
+    max_val = max(max(true), max(pred)) + 0.5
+
+    # Perfekte Vorhersage Linie und Toleranzlinien
+    perfect_line = np.linspace(min_val, max_val, 100)
+
+    # Perfekte Vorhersage (rot)
+    plt.plot(perfect_line, perfect_line, 'r-', linewidth=2,
+             label='Perfekte Vorhersage')
+
+    # +2/-2 Abweichungslinien (gestrichelt)
+    plt.plot(perfect_line, perfect_line + 2, 'k--', alpha=0.7, linewidth=1.5,
+             label='Toleranzbereich (±2 Blühstärken)')
+    plt.plot(perfect_line, perfect_line - 2, 'k--', alpha=0.7, linewidth=1.5)
+
+    # Beschriftungen und Titel
+    plt.xlabel('Tatsächliche Blühstärke', fontsize=14)
+    plt.ylabel('Vorhergesagte Blühstärke', fontsize=14)
+    plt.title('Streudiagramm: Vorhersagen vs. Tatsächliche Werte',
+              fontsize=16, pad=20)
+
+    # Legende
+    plt.legend(fontsize=12, loc='upper left')
+
+    # Achsengrenzen setzen
+    plt.xlim(min_val, max_val)
+    plt.ylim(min_val, max_val)
+
+    # Größere Achsenbeschriftungen in 1er Schritten
+    plt.xticks(np.arange(np.floor(min_val), np.ceil(max_val) + 1, 1), fontsize=12)
+    plt.yticks(np.arange(np.floor(min_val), np.ceil(max_val) + 1, 1), fontsize=12)
+
+    # Raster
+    plt.grid(True, linestyle='--', alpha=0.7)
+
+    # Layout anpassen mit mehr Platz
+    plt.tight_layout()
+
+    # Speichern in hoher Auflösung
+    plt.savefig(os.path.join(plots_dir, 'regression_scatter.png'),
+                dpi=300, bbox_inches='tight')
+    plt.close()
+
+    return plots_dir
+
+
+def plot_experiment_comparison():
+    # Vollständige Daten aus der Analyse
+    data = {
+        'Klassifikation': {
+            'ResNet': {'acc': 38.50, 'mae': 1.48, 'mse': 2.31},
+            'MobileNet': {'acc': 39.67, 'mae': 1.09, 'mse': 1.96}
+        },
+        'Regression': {
+            'ResNet': {'acc': 35.20, 'mae': 1.52, 'mse': 2.45},
+            'MobileNet': {'acc': 37.80, 'mae': 1.09, 'mse': 1.96}
+        },
+        'Hierarchisch': {
+            'ResNet': {'acc': 75.90, 'mae': 0.89, 'mse': 1.15},
+            'MobileNet': {'acc': 80.76, 'mae': 0.75, 'mse': 0.98}
+        }
+    }
+
+    experiments = list(data.keys())
+    width = 0.35
+
+    # 1. Plot Accuracy
+    fig_acc, ax_acc = plt.subplots(figsize=(15, 8))
+    x_acc = np.arange(len(experiments))
+
+    for i, exp in enumerate(experiments):
+        resnet_val = data[exp]['ResNet']['acc']
+        mobilenet_val = data[exp]['MobileNet']['acc']
+
+        resnet_bar = ax_acc.bar(x_acc[i] - width / 2, resnet_val, width,
+                                color=plt.cm.Set2(0))
+        mobilenet_bar = ax_acc.bar(x_acc[i] + width / 2, mobilenet_val, width,
+                                   color=plt.cm.Set2(1))
+
+        ax_acc.text(x_acc[i] - width / 2, resnet_val, f'ResNet\n{resnet_val:.2f}',
+                    ha='center', va='bottom', fontsize=8)
+        ax_acc.text(x_acc[i] + width / 2, mobilenet_val, f'MobileNet\n{mobilenet_val:.2f}',
+                    ha='center', va='bottom', fontsize=8)
+
+    ax_acc.set_ylabel('Genauigkeit')
+    ax_acc.set_title('Vergleich der Genauigkeit: ResNet vs MobileNet')
+    ax_acc.set_xticks(x_acc)
+    ax_acc.set_xticklabels(experiments)
+    ax_acc.grid(True, linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.savefig('experiment_comparison_accuracy.png', bbox_inches='tight', dpi=300)
+    plt.close()
+
+    # 2. Plot MAE and MSE (linear scale)
+    metrics = ['mae', 'mse']
+    metric_names = ['MAE', 'MSE']
+    x_err = np.arange(len(experiments) * 2)
+
+    fig_err, ax_err = plt.subplots(figsize=(15, 8))
+
+    for i, exp in enumerate(experiments):
+        for j, (metric, metric_name) in enumerate(zip(metrics, metric_names)):
+            pos = i * 2 + j
+            resnet_val = data[exp]['ResNet'][metric]
+            mobilenet_val = data[exp]['MobileNet'][metric]
+
+            resnet_bar = ax_err.bar(pos - width / 2, resnet_val, width,
+                                    color=plt.cm.Set2(j * 2))
+            mobilenet_bar = ax_err.bar(pos + width / 2, mobilenet_val, width,
+                                       color=plt.cm.Set2(j * 2 + 1))
+
+            ax_err.text(pos - width / 2, resnet_val, f'ResNet\n{resnet_val:.2f}',
+                        ha='center', va='bottom', fontsize=8)
+            ax_err.text(pos + width / 2, mobilenet_val, f'MobileNet\n{mobilenet_val:.2f}',
+                        ha='center', va='bottom', fontsize=8)
+
+    ax_err.set_ylabel('Fehlerwerte')
+    ax_err.set_title('Vergleich der Fehlermetriken: ResNet vs MobileNet')
+    ax_err.set_xticks(x_err)
+
+    labels = []
+    for exp in experiments:
+        for metric_name in metric_names:
+            labels.append(f'{exp}\n{metric_name}')
+    ax_err.set_xticklabels(labels, rotation=0)
+
+    ax_err.grid(True, linestyle='--', alpha=0.7)
+    # Setze die Y-Achsen-Grenzen auf sinnvolle Werte für lineare Skala
+    ax_err.set_ylim(0, 3)  # Angepasst für lineare Skala
+    plt.tight_layout()
+    plt.savefig('experiment_comparison_errors.png', bbox_inches='tight', dpi=300)
+    plt.close()
+
+
 
 
 def plot_training_curves(folder_name):
@@ -147,15 +310,6 @@ def loading_animation(duration=1.5):
 
 
 # Add new menu option
-def print_menu():
-    print("\nChoose an action:")
-    print("-" * 20)
-    print("1. 📊 Calculate All Metrics")
-    print("2. 📈 Plot Training Curves")
-    print("3. 📉 Plot Confusion Matrices")
-    print("4. 🔙 Go Back")
-    print("5. 🚪 Exit")
-    print("-" * 20)
 
 
 def plot_confusion_matrix(folder_name):
@@ -305,7 +459,24 @@ def calculate_metrics(folder_name):
     print(f"Cumulated Accuracy: {cumulated_acc:.4f}")
 
     return metrics
+
+
+def print_header():
+    print("\n" + "=" * 50)
+    print("🔍 Bloom Strength Evaluation Tool".center(50))
+    print("=" * 50 + "\n")
+
+
+def print_success(text):
+    print(f"\n✅ {text}")
+
+
+def print_error(text):
+    print(f"\n❌ {text}")
+
+
 def select_folder():
+    print("0: Plot Experiment Comparison")
     print("\nChoose the folder to evaluate:")
     # Get all folders in ./evaluate
     folders = [f for f in os.listdir('evaluate') if os.path.isdir(os.path.join('evaluate', f))]
@@ -320,13 +491,30 @@ def select_folder():
     while True:
         try:
             number = int(input("\n📂 Enter folder number: "))
-            if 1 <= number <= len(folders):
+            if 0 <= number <= len(folders):
+                # if 0, plot experiment comparison
+                if number == 0:
+                    plot_experiment_comparison()
+                    print_success("Experiment comparison plots saved successfully!")
+                    continue
                 folder_name = folders[number - 1]
                 print_success(f"Selected: {folder_name}")
                 return folder_name
             print_error(f"Please enter a number between 1 and {len(folders)}")
         except ValueError:
             print_error("Please enter a valid number")
+
+
+def print_menu():
+    print("\nChoose an action:")
+    print("-" * 20)
+    print("1. 📊 Calculate All Metrics")
+    print("2. 📈 Plot Training Curves")
+    print("3. 📉 Plot Confusion Matrices")
+    print("4. 📊 Plot Regression Scatter")
+    print("5. 🔙 Go Back")
+    print("6. 🚪 Exit")
+    print("-" * 20)
 
 
 if __name__ == '__main__':
@@ -371,10 +559,19 @@ if __name__ == '__main__':
                 except Exception as e:
                     print_error(f"An error occurred: {str(e)}")
             elif choice == '4':
+                print("\n🔄 Creating regression scatter plot...")
+                loading_animation()
+                try:
+                    plots_dir = plot_regression_scatter(folder_name)
+                    print_success(f"Regression scatter plot saved in {plots_dir}")
+                    print("\n" + "=" * 50)
+                except Exception as e:
+                    print_error(f"An error occurred: {str(e)}")
+            elif choice == '5':
                 print("\n🔙 Going back to folder selection...")
                 break
-            elif choice == '5':
+            elif choice == '6':
                 print("\n👋 Goodbye!")
                 exit(0)
             else:
-                print_error("Please enter 1, 2, 3, 4, or 5")
+                print_error("Please enter a number between 1 and 6")
