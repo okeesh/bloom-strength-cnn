@@ -216,7 +216,7 @@ def plot_experiment_comparison():
     ax_err.set_xticklabels(labels, rotation=0)
 
     ax_err.grid(True, linestyle='--', alpha=0.7)
-    ax_err.set_ylim(0, 3)
+    ax_err.set_ylim(0, 6)
     plt.tight_layout()
     plt.savefig('experiment_comparison_errors.png', bbox_inches='tight', dpi=300)
     plt.close()
@@ -328,6 +328,125 @@ def loading_animation(duration=1.5):
 
 
 # Add new menu option
+
+def calculate_precision_recall(folder_name):
+    """
+    Calculate and save precision and recall metrics for each class.
+    Also calculates macro and micro averages.
+    """
+    import numpy as np
+    from sklearn.metrics import precision_recall_fscore_support
+    import os
+    import json
+
+    # Read the JSON file
+    file_path = os.path.join('evaluate', folder_name, 'results.json')
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+
+    # Get predictions and true labels
+    predictions = np.array(data['predictions'])
+    true_labels = np.array(data['true_labels'])
+    model_type = data['model_type']
+
+    # Convert predictions to class labels (1-9)
+    if model_type in ['hierarchical', 'classification']:
+        pred_classes = np.argmax(predictions, axis=1) + 1
+        true_classes = np.argmax(true_labels, axis=1) + 1
+    else:  # regression
+        pred_values = np.array([p[0] for p in predictions])
+        true_values = np.array([t[0] for t in true_labels])
+        pred_classes = np.clip(np.round(pred_values), 1, 9).astype(int)
+        true_classes = np.clip(np.round(true_values), 1, 9).astype(int)
+
+    # Calculate precision and recall for each class
+    precision, recall, f1, support = precision_recall_fscore_support(
+        true_classes,
+        pred_classes,
+        labels=range(1, 10),  # 9 classes (1-9)
+        zero_division=0
+    )
+
+    # Calculate macro and micro averages
+    macro_precision, macro_recall, macro_f1, _ = precision_recall_fscore_support(
+        true_classes,
+        pred_classes,
+        average='macro',
+        zero_division=0
+    )
+
+    micro_precision, micro_recall, micro_f1, _ = precision_recall_fscore_support(
+        true_classes,
+        pred_classes,
+        average='micro',
+        zero_division=0
+    )
+
+    # Create metrics directory
+    metrics_dir = os.path.join('evaluate', folder_name, 'metrics')
+    os.makedirs(metrics_dir, exist_ok=True)
+
+    # Save detailed metrics to file
+    filename = os.path.join(metrics_dir, 'precision_recall_metrics.txt')
+    with open(filename, 'w') as f:
+        f.write("Precision and Recall Metrics\n")
+        f.write("===========================\n\n")
+
+        f.write("Per-Class Metrics:\n")
+        f.write("-----------------\n")
+        for i in range(9):
+            f.write(f"Class {i + 1}:\n")
+            f.write(f"  Precision: {precision[i]:.4f}\n")
+            f.write(f"  Recall: {recall[i]:.4f}\n")
+            f.write(f"  F1-Score: {f1[i]:.4f}\n")
+            f.write(f"  Support: {support[i]}\n\n")
+
+        f.write("\nAggregate Metrics:\n")
+        f.write("-----------------\n")
+        f.write(f"Macro Averages:\n")
+        f.write(f"  Precision: {macro_precision:.4f}\n")
+        f.write(f"  Recall: {macro_recall:.4f}\n")
+        f.write(f"  F1-Score: {macro_f1:.4f}\n\n")
+
+        f.write(f"Micro Averages:\n")
+        f.write(f"  Precision: {micro_precision:.4f}\n")
+        f.write(f"  Recall: {micro_recall:.4f}\n")
+        f.write(f"  F1-Score: {micro_f1:.4f}\n\n")
+
+        f.write("\nModel Information:\n")
+        f.write(f"Model Type: {model_type}\n")
+        if model_type == 'regression':
+            f.write('Note: Predictions were rounded to nearest integer for metric calculation\n')
+        f.write(f"Number of samples: {len(predictions)}\n")
+
+    print(f"\nPrecision and Recall metrics saved in {filename}")
+    print("\nPer-Class Summary:")
+    print("-----------------")
+    for i in range(9):
+        print(f"Class {i + 1}: Precision = {precision[i]:.4f}, Recall = {recall[i]:.4f}")
+    print("\nAggregate Metrics:")
+    print("-----------------")
+    print(f"Macro Precision: {macro_precision:.4f}")
+    print(f"Macro Recall: {macro_recall:.4f}")
+    print(f"Micro Precision: {micro_precision:.4f}")
+    print(f"Micro Recall: {micro_recall:.4f}")
+
+    return {
+        'precision': precision,
+        'recall': recall,
+        'f1': f1,
+        'support': support,
+        'macro_avg': {
+            'precision': macro_precision,
+            'recall': macro_recall,
+            'f1': macro_f1
+        },
+        'micro_avg': {
+            'precision': micro_precision,
+            'recall': micro_recall,
+            'f1': micro_f1
+        }
+    }
 
 
 def plot_confusion_matrix(folder_name):
@@ -479,6 +598,7 @@ def calculate_metrics(folder_name):
     return metrics
 
 
+
 def print_header():
     print("\n" + "=" * 50)
     print("🔍 Bloom Strength Evaluation Tool".center(50))
@@ -523,6 +643,120 @@ def select_folder():
             print_error("Please enter a valid number")
 
 
+def visualize_precision_recall(folder_name):
+    """
+    Creates comprehensive visualizations for precision and recall metrics.
+    Includes:
+    1. Bar chart comparing precision and recall for each class
+    2. Spider/Radar plot showing precision and recall patterns
+    3. Heatmap showing precision, recall, and F1 score together
+    """
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import numpy as np
+    import os
+    import json
+    from sklearn.metrics import precision_recall_fscore_support
+
+    # Read the JSON file
+    file_path = os.path.join('evaluate', folder_name, 'results.json')
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+
+    # Get predictions and true labels
+    predictions = np.array(data['predictions'])
+    true_labels = np.array(data['true_labels'])
+    model_type = data['model_type']
+
+    # Convert to class labels
+    if model_type in ['hierarchical', 'classification']:
+        pred_classes = np.argmax(predictions, axis=1) + 1
+        true_classes = np.argmax(true_labels, axis=1) + 1
+    else:  # regression
+        pred_values = np.array([p[0] for p in predictions])
+        true_values = np.array([t[0] for t in true_labels])
+        pred_classes = np.clip(np.round(pred_values), 1, 9).astype(int)
+        true_classes = np.clip(np.round(true_values), 1, 9).astype(int)
+
+    # Calculate metrics
+    precision, recall, f1, support = precision_recall_fscore_support(
+        true_classes,
+        pred_classes,
+        labels=range(1, 10),
+        zero_division=0
+    )
+
+    # Create plots directory
+    plots_dir = os.path.join('evaluate', folder_name, 'plots')
+    os.makedirs(plots_dir, exist_ok=True)
+
+    # 1. Bar Chart
+    plt.figure(figsize=(15, 8))
+    x = np.arange(9)
+    width = 0.35
+
+    plt.bar(x - width / 2, precision, width, label='Precision', color='skyblue')
+    plt.bar(x + width / 2, recall, width, label='Recall', color='lightcoral')
+
+    plt.xlabel('Blühstärke')
+    plt.ylabel('Score')
+    plt.title('Precision und Recall pro Klasse')
+    plt.xticks(x, [f'{i + 1}' for i in range(9)])
+    plt.legend()
+
+    # Add value labels on the bars
+    for i, v in enumerate(precision):
+        plt.text(i - width / 2, v, f'{v:.2f}', ha='center', va='bottom')
+    for i, v in enumerate(recall):
+        plt.text(i + width / 2, v, f'{v:.2f}', ha='center', va='bottom')
+
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, 'precision_recall_bars.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+
+    # 2. Spider/Radar Plot
+    angles = np.linspace(0, 2 * np.pi, 9, endpoint=False)
+
+    # Close the plot by appending first value
+    values_precision = np.concatenate((precision, [precision[0]]))
+    values_recall = np.concatenate((recall, [recall[0]]))
+    angles = np.concatenate((angles, [angles[0]]))
+
+    fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(projection='polar'))
+    ax.plot(angles, values_precision, 'o-', linewidth=2, label='Precision', color='skyblue')
+    ax.fill(angles, values_precision, alpha=0.25, color='skyblue')
+    ax.plot(angles, values_recall, 'o-', linewidth=2, label='Recall', color='lightcoral')
+    ax.fill(angles, values_recall, alpha=0.25, color='lightcoral')
+
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels([f'{i + 1}' for i in range(9)])
+    ax.set_title('Precision-Recall Radar Plot')
+    ax.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1))
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, 'precision_recall_radar.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+
+    # 3. Heatmap
+    metrics_matrix = np.array([precision, recall, f1])
+    plt.figure(figsize=(15, 6))
+    sns.heatmap(metrics_matrix,
+                annot=True,
+                fmt='.2f',
+                cmap='RdYlBu_r',
+                xticklabels=[f'{i + 1}' for i in range(9)],
+                yticklabels=['Precision', 'Recall', 'F1'],
+                cbar_kws={'label': 'Score'})
+
+    plt.xlabel('Blühstärke')
+    plt.title('Precision, Recall, und F1-Score Heatmap')
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, 'precision_recall_heatmap.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+
+    return plots_dir
+
 def print_menu():
     print("\nChoose an action:")
     print("-" * 20)
@@ -530,10 +764,10 @@ def print_menu():
     print("2. 📈 Plot Training Curves")
     print("3. 📉 Plot Confusion Matrices")
     print("4. 📊 Plot Regression Scatter")
-    print("5. 🔙 Go Back")
-    print("6. 🚪 Exit")
+    print("5. 📋 Calculate Precision/Recall")  # New option
+    print("6. 🔙 Go Back")
+    print("7. 🚪 Exit")
     print("-" * 20)
-
 
 if __name__ == '__main__':
     print_header()
@@ -586,10 +820,28 @@ if __name__ == '__main__':
                 except Exception as e:
                     print_error(f"An error occurred: {str(e)}")
             elif choice == '5':
-                print("\n🔙 Going back to folder selection...")
-                break
+                    print("\n🔄 Calculating precision and recall metrics...")
+                    loading_animation()
+                    try:
+                        calculate_precision_recall(folder_name)
+                        print_success("Precision and recall metrics calculated and saved successfully!")
+                        print("\n" + "=" * 50)
+                    except Exception as e:
+                        print_error(f"An error occurred: {str(e)}")
             elif choice == '6':
+                        print("\n🔄 Creating precision and recall visualizations...")
+                        loading_animation()
+                        try:
+                            plots_dir = visualize_precision_recall(folder_name)
+                            print_success(f"Precision and recall visualizations saved in {plots_dir}")
+                            print("\n" + "=" * 50)
+                        except Exception as e:
+                            print_error(f"An error occurred: {str(e)}")
+            elif choice == '7':
+                    print("\n🔙 Going back to folder selection...")
+                    break
+            elif choice == '8':
                 print("\n👋 Goodbye!")
                 exit(0)
             else:
-                print_error("Please enter a number between 1 and 6")
+                print_error("Please enter a number between 1 and 8")

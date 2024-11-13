@@ -216,8 +216,8 @@ def train_hierarchical_model():
         dropout_rate=0.1,
         regularization_rate=0.001,
         batch_size=16,
-        epochs=50,
-        pretrained_model=MobileNetV2(weights=None, include_top=False, input_shape=input_shape),
+        epochs=30,
+        pretrained_model=MobileNetV2(weights='imagenet', include_top=False, input_shape=input_shape),
         dense_units=256,
         num_classes=9,
         input_shape=input_shape
